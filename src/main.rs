@@ -4,16 +4,22 @@ fn main() {
     App::new()
     .add_plugins(DefaultPlugins)
         .add_systems(Startup, startup)
-        .add_systems(Update, player1)
+        .add_systems(Update, (player1_action,draw_fighters))
         .run();
 }
 
 #[derive(Component)]
-struct Health(f64);
+struct Health(f32);
 #[derive(Component)]
-struct Position(f64,f64);
+struct Position {
+    x : f32,
+    y : f32,
+}
 #[derive(Component)]
-struct Velocity(f64,f64);
+struct Velocity {
+    x : f32,
+    y : f32,
+}
 #[derive(Component, PartialEq)]
 enum Movement{
     Standing,
@@ -46,6 +52,7 @@ struct PlayerBundle{
     fighter: Fighter,
     health: Health,
     position: Position,
+    velocity: Velocity,
     movement: Movement,
     stance: Stance,
     sprite: SpriteSheetBundle,
@@ -58,7 +65,8 @@ impl Default for PlayerBundle {
             player: Player::Player1,
             fighter: Fighter::IDF,
             health : Health(100.0),
-            position : Position(0.0,0.0),
+            position : Position{x : 0.0, y :0.0},
+            velocity : Velocity{x : 0.0, y :0.0},
             movement : Movement::Standing,
             stance : Stance::Idle,
             sprite : SpriteSheetBundle::default(),
@@ -90,7 +98,7 @@ fn startup(
     commands.spawn(PlayerBundle::default());
 }
 
-fn player1(mut query: Query<(&Player, &mut Movement)>,
+fn player1_action(mut query: Query<(&Player, &mut Movement)>,
         keyboard_input: Res<Input<KeyCode>>) {
     for (player,mut movement) in query.iter_mut() {
         match player {
@@ -114,3 +122,19 @@ fn player1(mut query: Query<(&Player, &mut Movement)>,
             &Player::Player2 => {}
         }
 }}
+
+fn draw_fighters(query: Query<(&Position,
+                               &Movement,
+                               &Stance,
+                               &mut TextureAtlasSprite,
+                               &mut Transform,)>) {
+    for (position,
+         movement,
+         stance,
+         sprite,
+         transform) in query.iter() {
+        //choose correct sprite and draw at in the position
+
+        transform.with_translation(Vec3::new(position.x, position.y, 0.0));
+    }
+}
