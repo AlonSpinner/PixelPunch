@@ -12,7 +12,7 @@ fn main() {
 struct Health(f64);
 #[derive(Component)]
 struct Position(f64,f64);
-#[derive(Component)]
+#[derive(Component, PartialEq)]
 enum Movement{
     Standing,
     Jumping,
@@ -88,16 +88,24 @@ fn startup(
     commands.spawn(PlayerBundle::default());
 }
 
-fn player1(mut query: Query<(&Movement)>,
+fn player1(mut query: Query<(&Player, &Movement)>,
         keyboard_input: Res<Input<KeyCode>>) {
-    if can_move {
-    } else if keyboard_input.just_pressed(KeyCode::W) {
-        
-    } else if keyboard_input.just_pressed(KeyCode::S) {
-    
-    } else if keyboard_input.just_pressed(KeyCode::A) {
+    for (player, movement) in query.iter() {
+    match player {
+        Player::Player1 => {
+            if movement != &Movement::Jumping {
+                if keyboard_input.just_pressed(KeyCode::W) {
+                    
+                    
+                } else if keyboard_input.just_pressed(KeyCode::S) {
+                
+                } else if keyboard_input.just_pressed(KeyCode::A) {
 
-    } else if keyboard_input.just_pressed(KeyCode::D) {
+                } else if keyboard_input.just_pressed(KeyCode::D) {
 
+                }
+            }
+        }
+        &Player::Player2 => {}
     }
-}
+}}
