@@ -4,7 +4,9 @@ fn main() {
     App::new()
     .add_plugins(DefaultPlugins)
         .add_systems(Startup, startup)
-        .add_systems(Update, (player1_action,draw_fighters))
+        .add_systems(Update, (player1_action,
+                                                propogate_motion,
+                                                draw_fighters))
         .run();
 }
 
@@ -122,6 +124,13 @@ fn player1_action(mut query: Query<(&Player, &mut Movement)>,
             &Player::Player2 => {}
         }
 }}
+
+fn propogate_motion(mut query: Query<(&mut Position, &Velocity)>) {
+    for (mut position, velocity) in query.iter_mut() {
+        position.x = (position.x + velocity.x).clamp(0.0,1.0);
+        position.y = (position.y + velocity.y).clamp(0.0, 1.0);
+    }
+}
 
 fn draw_fighters(query: Query<(&Position,
                                &Movement,
