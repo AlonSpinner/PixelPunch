@@ -12,6 +12,8 @@ fn main() {
 struct Health(f64);
 #[derive(Component)]
 struct Position(f64,f64);
+#[derive(Component)]
+struct Velocity(f64,f64);
 #[derive(Component, PartialEq)]
 enum Movement{
     Standing,
@@ -88,24 +90,27 @@ fn startup(
     commands.spawn(PlayerBundle::default());
 }
 
-fn player1(mut query: Query<(&Player, &Movement)>,
+fn player1(mut query: Query<(&Player, &mut Movement)>,
         keyboard_input: Res<Input<KeyCode>>) {
-    for (player, movement) in query.iter() {
-    match player {
-        Player::Player1 => {
-            if movement != &Movement::Jumping {
-                if keyboard_input.just_pressed(KeyCode::W) {
-                    
-                    
-                } else if keyboard_input.just_pressed(KeyCode::S) {
-                
-                } else if keyboard_input.just_pressed(KeyCode::A) {
-
-                } else if keyboard_input.just_pressed(KeyCode::D) {
-
+    for (player,mut movement) in query.iter_mut() {
+        match player {
+            Player::Player1 => {
+                if *movement != Movement::Jumping {
+                    if keyboard_input.just_pressed(KeyCode::W) {
+                        *movement = Movement::Jumping;
+                        info!("jumping");
+                    } else if keyboard_input.pressed(KeyCode::S) {
+                        *movement = Movement::Docking;
+                        info!("docking");
+                    } else if keyboard_input.pressed(KeyCode::A) {
+                        *movement = Movement::Walking;
+                        info!("walking left");
+                    } else if keyboard_input.pressed(KeyCode::D) {
+                        *movement = Movement::Walking;
+                        info!("walking right");
+                    }
                 }
             }
+            &Player::Player2 => {}
         }
-        &Player::Player2 => {}
-    }
 }}
