@@ -1,9 +1,15 @@
+use std::cell::Cell;
+
 use bevy::prelude::*;
 
 const WALKING_SPEED : f32 = 5.0;
 const RUNNING_SPEED : f32 = 10.0;
 const GRAVITY : f32 = -1.0;
 const JUMPING_SPEED : f32 = 5.0;
+const CEILING_Y : f32 = 300.0;
+const FLOOR_Y : f32 = -300.0;
+const LEFT_WALL_X : f32 = -450.0;
+const RIGHT_WALL_X : f32 = 450.0;
 
 fn main() {
     App::new()
@@ -29,7 +35,7 @@ struct Velocity {
 #[derive(Component, PartialEq)]
 enum Movement{
     Standing,
-    Jumping,
+    InAir,
     Docking,
     Running,
     Walking,
@@ -113,9 +119,9 @@ fn player_control(mut query: Query<(&Player,
         mut velocity) in query.iter_mut() {
         match player {
             Player::Player1 => {
-                if *movement != Movement::Jumping {
+                if *movement != Movement::InAir {
                     if keyboard_input.just_pressed(KeyCode::W) {
-                        *movement = Movement::Jumping;
+                        *movement = Movement::InAir;
                         velocity.y = JUMPING_SPEED;
                     } else if keyboard_input.pressed(KeyCode::S) {
                         *movement = Movement::Docking;
@@ -142,13 +148,15 @@ fn update_motion(mut query: Query<(&mut Position,
     for (mut position,
          mut velocity,
          mut movement) in query.iter_mut() {
-        position.x = (position.x + dt*velocity.x).clamp(0.0,1.0);
-        position.y = (position.y + dt*velocity.y).clamp(0.0, 1.0);
+        
+        position.x = (position.x + dt*velocity.x).clamp(LEFT_WALL_X,RIGHT_WALL_X);
+        position.y = (position.y + dt*velocity.y).clamp(FLOOR_Y, CEILING_Y);
 
         if position.y == 0.0 {
             *movement = Movement::Standing;
+            velocity.y = 0.0;
         } else {
-            assert!(*movement == Movement::Jumping);
+            assert!(*movement == Movement::InAir);
             velocity.y = velocity.y - GRAVITY * dt;
         }
     }
