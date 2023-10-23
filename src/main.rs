@@ -1,5 +1,3 @@
-use std::cell::Cell;
-
 use bevy::prelude::*;
 
 const WALKING_SPEED : f32 = 5.0;
@@ -79,7 +77,7 @@ impl Default for PlayerBundle {
             health : Health(100.0),
             position : Position{x : 0.0, y :0.0},
             velocity : Velocity{x : 0.0, y :0.0},
-            movement : Movement::Standing,
+            movement : Movement::InAir,
             stance : Stance::Idle,
             sprite : SpriteSheetBundle::default(),
         }
@@ -89,6 +87,7 @@ impl Default for PlayerBundle {
 fn startup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut windows: Query<&mut Window>) {
     
     commands.spawn(Camera2dBundle::default());
@@ -107,7 +106,14 @@ fn startup(
     });
 
     //player1
-    commands.spawn(PlayerBundle::default());
+    let player_texture = asset_server.load("textures/0.png");
+    let texture_atlas =TextureAtlas::new_empty(player_texture, Vec2::new(100.0,100.0));
+    let texture_atlas_handle = texture_atlases.add(texture_atlas);
+    commands.spawn(PlayerBundle{sprite : SpriteSheetBundle {
+                                                texture_atlas: texture_atlas_handle,
+                                                ..default() }
+                ..default()
+                });
 }
 
 fn player_control(mut query: Query<(&Player,
