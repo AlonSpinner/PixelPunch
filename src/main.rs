@@ -1,13 +1,17 @@
 use bevy::prelude::*;
 
+const WALKING_SPEED : f32 = 5.0;
+const RUNNING_SPEED : f32 = 10.0;
+const GRAVITY : f32 = -1.0;
+const JUMPING_SPEED : f32 = 5.0;
+
 fn main() {
     App::new()
     .add_plugins(DefaultPlugins)
         .add_systems(Startup, startup)
-        .add_systems(Update, (player1_action,
-                                                propogate_motion,
-                                                draw_fighters))
-        .run();
+        .add_systems(Update, (player_control,
+                                                update_motion,
+                                                draw_fighters)).run();
 }
 
 #[derive(Component)]
@@ -100,24 +104,28 @@ fn startup(
     commands.spawn(PlayerBundle::default());
 }
 
-fn player1_action(mut query: Query<(&Player, &mut Movement)>,
+fn player_control(mut query: Query<(&Player,
+                                    &mut Movement,
+                                    &mut Velocity)>,
         keyboard_input: Res<Input<KeyCode>>) {
-    for (player,mut movement) in query.iter_mut() {
+    for (player,
+        mut movement,
+        mut velocity) in query.iter_mut() {
         match player {
             Player::Player1 => {
                 if *movement != Movement::Jumping {
                     if keyboard_input.just_pressed(KeyCode::W) {
                         *movement = Movement::Jumping;
-                        info!("jumping");
+                        velocity.y = JUMPING_SPEED;
                     } else if keyboard_input.pressed(KeyCode::S) {
                         *movement = Movement::Docking;
-                        info!("docking");
+                        velocity.x = 0.0;
                     } else if keyboard_input.pressed(KeyCode::A) {
                         *movement = Movement::Walking;
-                        info!("walking left");
+                        velocity.x = -WALKING_SPEED;
                     } else if keyboard_input.pressed(KeyCode::D) {
                         *movement = Movement::Walking;
-                        info!("walking right");
+                        velocity.x = WALKING_SPEED;
                     }
                 }
             }
@@ -125,10 +133,24 @@ fn player1_action(mut query: Query<(&Player, &mut Movement)>,
         }
 }}
 
-fn propogate_motion(mut query: Query<(&mut Position, &Velocity)>) {
-    for (mut position, velocity) in query.iter_mut() {
-        position.x = (position.x + velocity.x).clamp(0.0,1.0);
-        position.y = (position.y + velocity.y).clamp(0.0, 1.0);
+fn update_motion(mut query: Query<(&mut Position,
+                                      &mut Velocity,
+                                      &mut Movement)>,
+                                      time: Res<Time>,) {
+    let dt = time.delta_seconds();
+    
+    for (mut position,
+         mut velocity,
+         mut movement) in query.iter_mut() {
+        position.x = (position.x + dt*velocity.x).clamp(0.0,1.0);
+        position.y = (position.y + dt*velocity.y).clamp(0.0, 1.0);
+
+        if position.y == 0.0 {
+            *movement = Movement::Standing;
+        } else {
+            assert!(*movement == Movement::Jumping);
+            velocity.y = velocity.y - GRAVITY * dt;
+        }
     }
 }
 
