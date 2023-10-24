@@ -140,6 +140,9 @@ fn player_control(mut query: Query<(&Player,
                     } else if keyboard_input.pressed(KeyCode::D) {
                         *movement = Movement::Walking;
                         velocity.x = WALKING_SPEED;
+                    } else {
+                        *movement = Movement::Standing;
+                        velocity.x = 0.0;
                     }
                 }
             }
