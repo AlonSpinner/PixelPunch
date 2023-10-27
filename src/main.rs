@@ -1,8 +1,8 @@
-use bevy::prelude::*;
+use bevy::{ prelude::*};
 
-const WALKING_SPEED : f32 = 50.0;
+const WALKING_SPEED : f32 = 100.0;
 const RUNNING_SPEED : f32 = 100.0;
-const GRAVITY : f32 = -50.0;
+const GRAVITY : f32 = -100.0;
 const JUMPING_SPEED : f32 = 100.0;
 const CEILING_Y : f32 = 300.0;
 const FLOOR_Y : f32 = -300.0;
@@ -67,6 +67,23 @@ struct PlayerBundle{
     stance: Stance,
     sprite: SpriteSheetBundle,
 
+}
+
+// #[derive(Resource, Default)]
+// struct SpriteFolder(Handle<LoadedFolder>);
+
+fn load_textures(mut commands: Commands,
+                 asset_server: Res<AssetServer>,
+                 mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+                 mut textures: ResMut<Assets<Image>>,) {
+    let idle_texture_handles = asset_server.load_folder("textures/idle").unwrap();
+    let mut atlas_builder = TextureAtlasBuilder::default();
+    for texture_handle in idle_texture_handles.iter() {
+        let tmp: Handle<Image> = texture_handle.clone().typed();
+        atlas_builder.add_texture(tmp.clone(), textures.get(&tmp).unwrap());
+    }
+    let texture_atlas = atlas_builder.finish(textures.as_mut()).unwrap();
+    let texture_atlas_handle = texture_atlases.add(texture_atlas);
 }
 
 impl Default for PlayerBundle {
