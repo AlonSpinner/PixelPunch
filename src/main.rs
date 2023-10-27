@@ -1,4 +1,4 @@
-use bevy::{ prelude::*};
+use bevy::{prelude::*, asset::LoadState};
 
 const WALKING_SPEED : f32 = 100.0;
 const RUNNING_SPEED : f32 = 100.0;
@@ -11,9 +11,10 @@ const RIGHT_WALL_X : f32 = 450.0;
 
 fn main() {
     App::new()
-    .add_plugins(DefaultPlugins)
-        .add_systems(Startup, startup)
-        .add_systems(Update, (player_control,
+    .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+    .add_state::<AppState>()
+    .add_systems(OnEnter(AppState::Setup), (load_textures, check_textures_loaded, startup))
+    .add_systems(Update, (player_control,
                                                 update_motion,
                                                 draw_fighters)).run();
 }
@@ -56,6 +57,14 @@ enum Player{
     Player2,
 }
 
+#[derive(Component)]
+enum AnimationType{
+    Idle,
+    Walking,
+    Running,
+}
+
+
 #[derive(Bundle)]
 struct PlayerBundle{
     player: Player,
@@ -69,22 +78,88 @@ struct PlayerBundle{
 
 }
 
-// #[derive(Resource, Default)]
-// struct SpriteFolder(Handle<LoadedFolder>);
+#[derive(Resource)]
+struct AnimationSpriteHandles{
+    handles: Vec<Handle<Image>>,
+    animation_type: AnimationType,}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, States)]
+enum AppState {
+    #[default]
+    Setup,
+    Running,
+    Finished,
+}
 
 fn load_textures(mut commands: Commands,
-                 asset_server: Res<AssetServer>,
-                 mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-                 mut textures: ResMut<Assets<Image>>,) {
-    let idle_texture_handles = asset_server.load_folder("textures/idle").unwrap();
-    let mut atlas_builder = TextureAtlasBuilder::default();
-    for texture_handle in idle_texture_handles.iter() {
-        let tmp: Handle<Image> = texture_handle.clone().typed();
-        atlas_builder.add_texture(tmp.clone(), textures.get(&tmp).unwrap());
+                 asset_server: Res<AssetServer>,) {
+    let animations = vec!(
+                 ("Idle",AnimationType::Idle),
+                 ("Walking",AnimationType::Walking),
+                 ("Running",AnimationType::Running),
+                );
+
+    for (animation_name, animation_type) in animations {
+        let mut image_handles: Vec<Handle<Image>> = Vec::new();
+        let texture_folder_path = format!("textures/{}", animation_name);
+        let untyped_handles = asset_server.load_folder(texture_folder_path).unwrap();
+        for handle in untyped_handles.iter() {
+            let image_handle: Handle<Image> = handle.clone().typed();
+            image_handles.push(image_handle);
+        }
+        commands.insert_resource(AnimationSpriteHandles{handles : image_handles,
+                                               animation_type : animation_type});
     }
-    let texture_atlas = atlas_builder.finish(textures.as_mut()).unwrap();
-    let texture_atlas_handle = texture_atlases.add(texture_atlas);
 }
+
+fn check_textures_loaded(
+    mut next_state: ResMut<NextState<AppState>>,
+    animation_sprite_handles: ResMut<AnimationSpriteHandles>,
+    asset_server: Res<AssetServer>,) {
+
+    let mut all_loaded = true;
+
+    for handle in &animation_sprite_handles.handles {
+        let load_state = asset_server.get_load_state(handle);
+        match load_state {
+            LoadState::Loaded => continue,
+            LoadState::NotLoaded => {
+                all_loaded = false;
+                break;
+            } LoadState::Failed => {
+                // panic!("Failed to load sprite");
+            }
+            LoadState::Loading => {
+                //display loading bar in terminal
+                all_loaded = false;
+                break;
+            }
+            other => {
+                // panic!("Unexpected load state: {:?}", other);
+            }
+        }
+    }
+    if all_loaded {
+        next_state.set(AppState::Running);
+    }
+}
+
+
+// fn build_textures_atlas(mut commands: Commands,
+//                  asset_server: Res<AssetServer>,
+//                  mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+//                  mut textures: ResMut<Assets<Image>>,
+//                 sprite_folder: ResMut<SpriteHandles>) {
+//     let mut atlas_builder = TextureAtlasBuilder::default();
+//     for texture_handle in &sprite_folder.0 {
+//         if let Some(tex) = textures.get(&texture_handle) {
+//             atlas_builder.add_texture(texture_handle.clone(), tex)
+//         }
+            
+//     }
+//     let texture_atlas = atlas_builder.finish(&mut textures).unwrap();
+//     let texture_atlas_handle = texture_atlases.add(texture_atlas);
+// }
 
 impl Default for PlayerBundle {
     fn default() -> Self {
