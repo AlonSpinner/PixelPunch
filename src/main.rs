@@ -13,10 +13,28 @@ fn main() {
     App::new()
     .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
     .add_state::<AppState>()
-    .add_systems(OnEnter(AppState::Setup), (load_textures, check_textures_loaded, startup))
-    .add_systems(Update, (player_control,
-                                                update_motion,
-                                                draw_fighters)).run();
+    .add_systems(OnEnter(AppState::Setup), load_textures)
+    .add_systems(Update, check_textures_loaded.run_if(in_state(AppState::Setup)))
+    
+    .add_systems(OnEnter(AppState::InGame), setup_game)
+    .add_systems(
+        PreUpdate,
+        player_control.run_if(in_state(AppState::InGame)),
+    )
+    .add_systems(
+        Update,
+        (update_motion,
+                 draw_fighters).run_if(in_state(AppState::InGame)),
+    )
+    .add_systems(Update, bevy::window::close_on_esc)
+    .run();
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, States)]
+pub enum AppState {
+    #[default]
+    Setup,
+    InGame,
 }
 
 #[derive(Component)]
@@ -83,14 +101,6 @@ struct AnimationSpriteHandles{
     handles: Vec<Handle<Image>>,
     animation_type: AnimationType,}
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, States)]
-enum AppState {
-    #[default]
-    Setup,
-    Running,
-    Finished,
-}
-
 fn load_textures(mut commands: Commands,
                  asset_server: Res<AssetServer>,) {
     let animations = vec!(
@@ -115,32 +125,29 @@ fn load_textures(mut commands: Commands,
 fn check_textures_loaded(
     mut next_state: ResMut<NextState<AppState>>,
     animation_sprite_handles: ResMut<AnimationSpriteHandles>,
-    asset_server: Res<AssetServer>,) {
-
+    asset_server: Res<AssetServer>,
+) {
     let mut all_loaded = true;
 
     for handle in &animation_sprite_handles.handles {
         let load_state = asset_server.get_load_state(handle);
         match load_state {
             LoadState::Loaded => continue,
-            LoadState::NotLoaded => {
-                all_loaded = false;
-                break;
-            } LoadState::Failed => {
-                // panic!("Failed to load sprite");
-            }
-            LoadState::Loading => {
-                //display loading bar in terminal
+            LoadState::NotLoaded | LoadState::Loading => {
                 all_loaded = false;
                 break;
             }
-            other => {
-                // panic!("Unexpected load state: {:?}", other);
+            LoadState::Failed => {
+                panic!("Failed to load sprite");
+            }
+            _ => {
+                panic!("Unexpected load state");
             }
         }
     }
+
     if all_loaded {
-        next_state.set(AppState::Running);
+        next_state.set(AppState::InGame);
     }
 }
 
@@ -176,7 +183,7 @@ impl Default for PlayerBundle {
     }
 }
 
-fn startup(
+fn setup_game(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
