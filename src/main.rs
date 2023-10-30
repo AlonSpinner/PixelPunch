@@ -1,4 +1,5 @@
 use bevy::{prelude::*, asset::LoadState};
+use std::collections::HashMap;
 
 const WALKING_SPEED : f32 = 100.0;
 const RUNNING_SPEED : f32 = 100.0;
@@ -8,6 +9,7 @@ const CEILING_Y : f32 = 300.0;
 const FLOOR_Y : f32 = -300.0;
 const LEFT_WALL_X : f32 = -450.0;
 const RIGHT_WALL_X : f32 = 450.0;
+const SPRITE_WIDTH_HEIGHT : f32 = 100.0;
 
 fn main() {
     App::new()
@@ -75,7 +77,7 @@ enum Player{
     Player2,
 }
 
-#[derive(Component)]
+#[derive(Component,PartialEq, Eq, Hash)]
 enum AnimationType{
     Idle,
     Walking,
@@ -95,14 +97,14 @@ struct PlayerBundle{
     sprite: SpriteSheetBundle,
 
 }
-
 #[derive(Resource)]
-struct AnimationSpriteHandles{
-    handles: Vec<Handle<Image>>,
-    animation_type: AnimationType,}
+struct AnimationHashMap(HashMap<AnimationType, Vec<Handle<Image>>>);
 
 fn load_textures(mut commands: Commands,
                  asset_server: Res<AssetServer>,) {
+
+    let mut hashmap: HashMap<AnimationType, Vec<Handle<Image>>> = HashMap::new();
+
     let animations = vec!(
                  ("Idle",AnimationType::Idle),
                  ("Walking",AnimationType::Walking),
@@ -117,31 +119,35 @@ fn load_textures(mut commands: Commands,
             let image_handle: Handle<Image> = handle.clone().typed();
             image_handles.push(image_handle);
         }
-        commands.insert_resource(AnimationSpriteHandles{handles : image_handles,
-                                               animation_type : animation_type});
+        hashmap.insert(animation_type, image_handles);
     }
+
+    commands.insert_resource(AnimationHashMap(hashmap));
 }
 
 fn check_textures_loaded(
     mut next_state: ResMut<NextState<AppState>>,
-    animation_sprite_handles: ResMut<AnimationSpriteHandles>,
+    animation_hashmap: ResMut<AnimationHashMap>,
     asset_server: Res<AssetServer>,
 ) {
     let mut all_loaded = true;
 
-    for handle in &animation_sprite_handles.handles {
-        let load_state = asset_server.get_load_state(handle);
-        match load_state {
-            LoadState::Loaded => continue,
-            LoadState::NotLoaded | LoadState::Loading => {
-                all_loaded = false;
-                break;
-            }
-            LoadState::Failed => {
-                panic!("Failed to load sprite");
-            }
-            _ => {
-                panic!("Unexpected load state");
+    for animation_type in animation_hashmap.0.keys() {
+        let animation_sprite_handles = animation_hashmap.0.get(animation_type).unwrap();
+        for handle in animation_sprite_handles {
+            let load_state = asset_server.get_load_state(handle);
+            match load_state {
+                LoadState::Loaded => continue,
+                LoadState::NotLoaded | LoadState::Loading => {
+                    all_loaded = false;
+                    break;
+                }
+                LoadState::Failed => {
+                    panic!("Failed to load sprite");
+                }
+                _ => {
+                    panic!("Unexpected load state");
+                }
             }
         }
     }
@@ -150,23 +156,6 @@ fn check_textures_loaded(
         next_state.set(AppState::InGame);
     }
 }
-
-
-// fn build_textures_atlas(mut commands: Commands,
-//                  asset_server: Res<AssetServer>,
-//                  mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-//                  mut textures: ResMut<Assets<Image>>,
-//                 sprite_folder: ResMut<SpriteHandles>) {
-//     let mut atlas_builder = TextureAtlasBuilder::default();
-//     for texture_handle in &sprite_folder.0 {
-//         if let Some(tex) = textures.get(&texture_handle) {
-//             atlas_builder.add_texture(texture_handle.clone(), tex)
-//         }
-            
-//     }
-//     let texture_atlas = atlas_builder.finish(&mut textures).unwrap();
-//     let texture_atlas_handle = texture_atlases.add(texture_atlas);
-// }
 
 impl Default for PlayerBundle {
     fn default() -> Self {
@@ -187,6 +176,8 @@ fn setup_game(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut textures: ResMut<Assets<Image>>,
+    animation_hashmap: Res<AnimationHashMap>,
     mut windows: Query<&mut Window>) {
     
     commands.spawn(Camera2dBundle::default());
@@ -204,17 +195,35 @@ fn setup_game(
         ..default()
     });
 
-    //player1
-    let player_texture = asset_server.load("textures/0.png");
-    let texture_atlas = TextureAtlas::from_grid(player_texture, Vec2::new(900.0, 900.0), 1, 1,None, None); // 1x1 grid since we have only one sprite
+    //fighters
+    let mut sprite_count = 0;
+    for animation_type in animation_hashmap.0.keys() {
+        let animation_sprite_handles = animation_hashmap.0.get(animation_type).unwrap();
+        sprite_count += animation_sprite_handles.len();
+    }
+    info!("building atlas from {} images", sprite_count);
+
+    let mut atlas_builder = TextureAtlasBuilder::default()
+                                                .max_size(Vec2::new(sprite_count as f32 * SPRITE_WIDTH_HEIGHT,
+                                                                    sprite_count as f32 * SPRITE_WIDTH_HEIGHT));
+    for animation_type in animation_hashmap.0.keys() {
+        let animation_sprite_handles = animation_hashmap.0.get(animation_type).unwrap();
+        for handle in animation_sprite_handles {
+            if let Some(image) = textures.get(handle) {
+                atlas_builder.add_texture(handle.clone(), image)
+            }
+        }
+    }
+    let texture_atlas = atlas_builder.finish(&mut textures).unwrap();
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
-    commands.spawn(PlayerBundle{sprite : SpriteSheetBundle {
-                                        texture_atlas: texture_atlas_handle,
-                                        sprite: TextureAtlasSprite{index : 0,
-                                                                   custom_size : Some(Vec2::new(100.0,100.0)),
-                                                                  ..default()},
-                                        ..default()},
-                        ..default() });
+
+    let sprite_sheet_bundle = SpriteSheetBundle {
+        texture_atlas: texture_atlas_handle,
+        sprite: TextureAtlasSprite::default(),
+        ..default()};
+
+    //player1
+    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(), ..default()});
 }
 
 fn player_control(mut query: Query<(&Player,
@@ -286,7 +295,9 @@ fn draw_fighters(mut query: Query<(&Position,
          mut sprite,
          mut transform) in query.iter_mut() {
         //choose correct sprite and draw at in the position
+        
         transform.translation = Vec3::new(position.x, position.y, 0.0);
+
         if velocity.x > 0.0 {
             sprite.flip_x = false;
         } else if velocity.x < 0.0 {
