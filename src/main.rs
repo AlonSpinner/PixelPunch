@@ -1,5 +1,6 @@
 use bevy::{prelude::*, asset::LoadState};
 use std::collections::HashMap;
+use std::time::Duration;
 
 const WALKING_SPEED : f32 = 100.0;
 const RUNNING_SPEED : f32 = 100.0;
@@ -10,6 +11,7 @@ const FLOOR_Y : f32 = -300.0;
 const LEFT_WALL_X : f32 = -450.0;
 const RIGHT_WALL_X : f32 = 450.0;
 const SPRITE_WIDTH_HEIGHT : f32 = 100.0;
+const ANIMATION_TIME : f32 = 0.1;
 
 fn main() {
     App::new()
@@ -51,10 +53,10 @@ struct Velocity {
     x : f32,
     y : f32,
 }
-#[derive(Component, PartialEq)]
+#[derive(Component, Debug, PartialEq, Eq, Hash)]
 enum Movement{
-    Standing,
-    InAir,
+    Idle,
+    JumpLoop,
     Docking,
     Running,
     Walking,
@@ -77,13 +79,8 @@ enum Player{
     Player2,
 }
 
-#[derive(Component,PartialEq, Eq, Hash)]
-enum AnimationType{
-    Idle,
-    Walking,
-    Running,
-}
-
+#[derive(Component)]
+struct ChangedMovement(bool);
 
 #[derive(Bundle)]
 struct PlayerBundle{
@@ -95,20 +92,27 @@ struct PlayerBundle{
     movement: Movement,
     stance: Stance,
     sprite: SpriteSheetBundle,
-
 }
+
+#[derive(Component, Deref, DerefMut)]
+struct AnimationTimer(Timer);
+
 #[derive(Resource)]
-struct AnimationHashMap(HashMap<AnimationType, Vec<Handle<Image>>>);
+struct AnimationImageHandles{image_handles : HashMap<Movement, Vec<Handle<Image>>>,}
+
+#[derive(Resource)]
+struct AnimationIndicies{indicies : HashMap<Movement, [usize;2]>,}
 
 fn load_textures(mut commands: Commands,
                  asset_server: Res<AssetServer>,) {
 
-    let mut hashmap: HashMap<AnimationType, Vec<Handle<Image>>> = HashMap::new();
+    let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::new();
 
     let animations = vec!(
-                 ("Idle",AnimationType::Idle),
-                 ("Walking",AnimationType::Walking),
-                 ("Running",AnimationType::Running),
+                 ("Idle",Movement::Idle),
+                 ("Walking",Movement::Walking),
+                 ("Running",Movement::Running),
+                 ("JumpLoop",Movement::JumpLoop),
                 );
 
     for (animation_name, animation_type) in animations {
@@ -119,21 +123,21 @@ fn load_textures(mut commands: Commands,
             let image_handle: Handle<Image> = handle.clone().typed();
             image_handles.push(image_handle);
         }
-        hashmap.insert(animation_type, image_handles);
+        image_handle_hashmap.insert(animation_type, image_handles);
     }
 
-    commands.insert_resource(AnimationHashMap(hashmap));
+    commands.insert_resource(AnimationImageHandles{image_handles : image_handle_hashmap});
 }
 
 fn check_textures_loaded(
     mut next_state: ResMut<NextState<AppState>>,
-    animation_hashmap: ResMut<AnimationHashMap>,
+    animation_hashmap: ResMut<AnimationImageHandles>,
     asset_server: Res<AssetServer>,
 ) {
     let mut all_loaded = true;
 
-    for animation_type in animation_hashmap.0.keys() {
-        let animation_sprite_handles = animation_hashmap.0.get(animation_type).unwrap();
+    for animation_type in animation_hashmap.image_handles.keys() {
+        let animation_sprite_handles = animation_hashmap.image_handles.get(animation_type).unwrap();
         for handle in animation_sprite_handles {
             let load_state = asset_server.get_load_state(handle);
             match load_state {
@@ -165,7 +169,7 @@ impl Default for PlayerBundle {
             health : Health(100.0),
             position : Position{x : 0.0, y :0.0},
             velocity : Velocity{x : 0.0, y :0.0},
-            movement : Movement::InAir,
+            movement : Movement::JumpLoop,
             stance : Stance::Idle,
             sprite : SpriteSheetBundle::default(),
         }
@@ -177,7 +181,7 @@ fn setup_game(
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut textures: ResMut<Assets<Image>>,
-    animation_hashmap: Res<AnimationHashMap>,
+    animation_hashmap: Res<AnimationImageHandles>,
     mut windows: Query<&mut Window>) {
     
     commands.spawn(Camera2dBundle::default());
@@ -196,26 +200,25 @@ fn setup_game(
     });
 
     //fighters
-    let mut sprite_count = 0;
-    for animation_type in animation_hashmap.0.keys() {
-        let animation_sprite_handles = animation_hashmap.0.get(animation_type).unwrap();
-        sprite_count += animation_sprite_handles.len();
-    }
-    info!("building atlas from {} images", sprite_count);
+    let sprite_count: usize;
 
     let mut atlas_builder = TextureAtlasBuilder::default()
                                                 .max_size(Vec2::new(sprite_count as f32 * SPRITE_WIDTH_HEIGHT,
                                                                     sprite_count as f32 * SPRITE_WIDTH_HEIGHT));
-    for animation_type in animation_hashmap.0.keys() {
-        let animation_sprite_handles = animation_hashmap.0.get(animation_type).unwrap();
+    
+    let mut animation_indicies_hashmap: HashMap<Movement, [usize;2]> = HashMap::new();
+    let mut index = 0;
+    for animation_type in animation_hashmap.image_handles.keys() {
+        let animation_sprite_handles = animation_hashmap.image_handles.get(animation_type).unwrap();
         for handle in animation_sprite_handles {
-            if let Some(image) = textures.get(handle) {
-                atlas_builder.add_texture(handle.clone(), image)
-            }
+            atlas_builder.add_texture(handle.clone(), textures.get(handle).unwrap());
         }
+        animation_indicies_hashmap.insert(*animation_type, [index, index + animation_sprite_handles.len() - 1]);
+        index += animation_sprite_handles.len();
     }
     let texture_atlas = atlas_builder.finish(&mut textures).unwrap();
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
+    commands.insert_resource(AnimationIndicies{indicies : animation_indicies_hashmap});
 
     let sprite_sheet_bundle = SpriteSheetBundle {
         texture_atlas: texture_atlas_handle,
@@ -223,7 +226,9 @@ fn setup_game(
         ..default()};
 
     //player1
-    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(), ..default()});
+    commands.spawn((PlayerBundle{sprite : sprite_sheet_bundle, ..default()},
+    AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating))
+    ));
 }
 
 fn player_control(mut query: Query<(&Player,
@@ -235,9 +240,9 @@ fn player_control(mut query: Query<(&Player,
         mut velocity) in query.iter_mut() {
         match player {
             Player::Player1 => {
-                if *movement != Movement::InAir {
+                if *movement != Movement::JumpLoop {
                     if keyboard_input.just_pressed(KeyCode::W) {
-                        *movement = Movement::InAir;
+                        *movement = Movement::JumpLoop;
                         velocity.y = JUMPING_SPEED;
                     } else if keyboard_input.pressed(KeyCode::S) {
                         *movement = Movement::Docking;
@@ -249,7 +254,7 @@ fn player_control(mut query: Query<(&Player,
                         *movement = Movement::Walking;
                         velocity.x = WALKING_SPEED;
                     } else {
-                        *movement = Movement::Standing;
+                        *movement = Movement::Idle;
                         velocity.x = 0.0;
                     }
                 }
@@ -272,29 +277,55 @@ fn update_motion(mut query: Query<(&mut Position,
         position.y = (position.y + dt*velocity.y).clamp(FLOOR_Y, CEILING_Y);
 
         if position.y <= FLOOR_Y {
-            *movement = Movement::Standing;
+            *movement = Movement::Idle;
             velocity.y = 0.0;
             position.y = FLOOR_Y;
         } else {
-            assert!(*movement == Movement::InAir);
+            assert!(*movement == Movement::JumpLoop);
             velocity.y = velocity.y + GRAVITY * dt;
         }
     }
 }
 
-fn draw_fighters(mut query: Query<(&Position,
+fn draw_fighters(time: Res<Time>,
+                animation_hashmap: Res<AnimationHashMap>,
+                mut query: Query<(&Position,
                                &Velocity,
-                               &Movement,
-                               &Stance,
+                               Ref<Movement>,
+                               &mut AnimationTimer,
                                &mut TextureAtlasSprite,
                                &mut Transform,)>) {
     for (position,
          velocity,
          movement,
-         stance,
+         mut animation_timer,
          mut sprite,
          mut transform) in query.iter_mut() {
-        //choose correct sprite and draw at in the position
+        
+        animation_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
+        if animation_timer.just_finished() {
+            if !movement.is_changed() {
+                sprite.index = (sprite.index + 1) % animation_hashmap.0.get(movement.into_inner()).unwrap().len();
+            } else {
+            match movement.into_inner() {
+                Movement::Idle => {
+                    sprite.index = 0;
+                }
+                Movement::Walking => {
+                    sprite.index = 10;
+                }
+                Movement::Running => {
+                    sprite.index = 0;
+                }
+                Movement::JumpLoop => {
+                    sprite.index = 20;
+                }
+                Movement::Docking => {
+                    sprite.index = 0;
+                }
+               }
+            }
+        }
         
         transform.translation = Vec3::new(position.x, position.y, 0.0);
 
