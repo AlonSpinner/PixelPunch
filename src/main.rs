@@ -53,7 +53,7 @@ struct Velocity {
     x : f32,
     y : f32,
 }
-#[derive(Component, Debug, PartialEq, Eq, Hash)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Movement{
     Idle,
     JumpLoop,
@@ -136,8 +136,8 @@ fn check_textures_loaded(
 ) {
     let mut all_loaded = true;
 
-    for animation_type in animation_hashmap.image_handles.keys() {
-        let animation_sprite_handles = animation_hashmap.image_handles.get(animation_type).unwrap();
+    for movement in animation_hashmap.image_handles.keys() {
+        let animation_sprite_handles = animation_hashmap.image_handles.get(movement).unwrap();
         for handle in animation_sprite_handles {
             let load_state = asset_server.get_load_state(handle);
             match load_state {
@@ -200,7 +200,11 @@ fn setup_game(
     });
 
     //fighters
-    let sprite_count: usize;
+    let mut sprite_count = 0;
+    for animation_type in animation_hashmap.image_handles.keys() {
+        let animation_sprite_handles = animation_hashmap.image_handles.get(animation_type).unwrap();
+        sprite_count += animation_sprite_handles.len();
+    }
 
     let mut atlas_builder = TextureAtlasBuilder::default()
                                                 .max_size(Vec2::new(sprite_count as f32 * SPRITE_WIDTH_HEIGHT,
@@ -208,17 +212,18 @@ fn setup_game(
     
     let mut animation_indicies_hashmap: HashMap<Movement, [usize;2]> = HashMap::new();
     let mut index = 0;
-    for animation_type in animation_hashmap.image_handles.keys() {
-        let animation_sprite_handles = animation_hashmap.image_handles.get(animation_type).unwrap();
+    for movement in animation_hashmap.image_handles.keys() {
+        let animation_sprite_handles = animation_hashmap.image_handles.get(movement).unwrap();
         for handle in animation_sprite_handles {
             atlas_builder.add_texture(handle.clone(), textures.get(handle).unwrap());
         }
-        animation_indicies_hashmap.insert(*animation_type, [index, index + animation_sprite_handles.len() - 1]);
+        animation_indicies_hashmap.insert(*movement, [index, index + animation_sprite_handles.len() - 1]);
         index += animation_sprite_handles.len();
     }
     let texture_atlas = atlas_builder.finish(&mut textures).unwrap();
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
     commands.insert_resource(AnimationIndicies{indicies : animation_indicies_hashmap});
+    assert!(index == sprite_count);
 
     let sprite_sheet_bundle = SpriteSheetBundle {
         texture_atlas: texture_atlas_handle,
@@ -288,7 +293,7 @@ fn update_motion(mut query: Query<(&mut Position,
 }
 
 fn draw_fighters(time: Res<Time>,
-                animation_hashmap: Res<AnimationHashMap>,
+                animation_indicies: Res<AnimationIndicies>,
                 mut query: Query<(&Position,
                                &Velocity,
                                Ref<Movement>,
@@ -304,26 +309,10 @@ fn draw_fighters(time: Res<Time>,
         
         animation_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
         if animation_timer.just_finished() {
-            if !movement.is_changed() {
-                sprite.index = (sprite.index + 1) % animation_hashmap.0.get(movement.into_inner()).unwrap().len();
+            if movement.is_changed() {
+                sprite.index = animation_indicies.indicies.get(movement.into_inner()).unwrap()[0];
             } else {
-            match movement.into_inner() {
-                Movement::Idle => {
-                    sprite.index = 0;
-                }
-                Movement::Walking => {
-                    sprite.index = 10;
-                }
-                Movement::Running => {
-                    sprite.index = 0;
-                }
-                Movement::JumpLoop => {
-                    sprite.index = 20;
-                }
-                Movement::Docking => {
-                    sprite.index = 0;
-                }
-               }
+                sprite.index = (sprite.index + 1) % animation_indicies.indicies.get(movement.into_inner()).unwrap()[1];
             }
         }
         
