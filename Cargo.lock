@@ -890,6 +890,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_tile_atlas"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15ea6488c3bedb78210f17894d1b03c2ac8c7af10eb65f0172d2d8fe29f2d89d"
+dependencies = [
+ "bevy_asset",
+ "bevy_ecs",
+ "bevy_log",
+ "bevy_math",
+ "bevy_render",
+ "bevy_sprite",
+ "bevy_utils",
+ "thiserror",
+]
+
+[[package]]
 name = "bevy_time"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2545,6 +2561,7 @@ name = "pixel_punch"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_tile_atlas",
 ]
 
 [[package]]

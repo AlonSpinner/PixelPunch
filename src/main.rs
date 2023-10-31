@@ -1,4 +1,5 @@
 use bevy::{prelude::*, asset::LoadState};
+use bevy_tile_atlas::TileAtlasBuilder;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -110,8 +111,9 @@ fn load_textures(mut commands: Commands,
 
     let animations = vec!(
                  ("Idle",Movement::Idle),
-                //  ("Walking",Movement::Walking),
-                //  ("Running",Movement::Running),
+                 ("Sliding",Movement::Docking),
+                 ("Walking",Movement::Walking),
+                 ("Running",Movement::Running),
                  ("JumpLoop",Movement::JumpLoop),
                 );
 
@@ -206,16 +208,14 @@ fn setup_game(
         sprite_count += animation_sprite_handles.len();
     }
 
-    let mut atlas_builder = TextureAtlasBuilder::default()
-                                                .max_size(Vec2::new(sprite_count as f32 * SPRITE_WIDTH_HEIGHT,
-                                                                    sprite_count as f32 * SPRITE_WIDTH_HEIGHT));
+    let mut atlas_builder = TileAtlasBuilder::default();
     
     let mut animation_indicies_hashmap: HashMap<Movement, [usize;2]> = HashMap::new();
     let mut index = 0;
     for movement in animation_hashmap.image_handles.keys() {
         let animation_sprite_handles = animation_hashmap.image_handles.get(movement).unwrap();
         for handle in animation_sprite_handles {
-            atlas_builder.add_texture(handle.clone(), textures.get(handle).unwrap());
+            atlas_builder.add_texture(handle.clone(), textures.get(handle).unwrap()).unwrap();
         }
         animation_indicies_hashmap.insert(*movement, [index, animation_sprite_handles.len()]);
         index += animation_sprite_handles.len();
@@ -229,13 +229,6 @@ fn setup_game(
         texture_atlas: texture_atlas_handle,
         sprite: TextureAtlasSprite::default(),
         ..default()};
-
-    //spawn texture_atlas
-    commands.spawn((SpriteBundle {
-        texture: texture_atlas.texture.clone(),
-        transform: Transform::from_xyz(0.0, 0.0, 1.0),
-        ..default()
-    },));
 
     //player1
     commands.spawn((PlayerBundle{sprite : sprite_sheet_bundle, ..default()},
