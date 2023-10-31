@@ -110,8 +110,8 @@ fn load_textures(mut commands: Commands,
 
     let animations = vec!(
                  ("Idle",Movement::Idle),
-                 ("Walking",Movement::Walking),
-                 ("Running",Movement::Running),
+                //  ("Walking",Movement::Walking),
+                //  ("Running",Movement::Running),
                  ("JumpLoop",Movement::JumpLoop),
                 );
 
@@ -217,11 +217,11 @@ fn setup_game(
         for handle in animation_sprite_handles {
             atlas_builder.add_texture(handle.clone(), textures.get(handle).unwrap());
         }
-        animation_indicies_hashmap.insert(*movement, [index, index + animation_sprite_handles.len() - 1]);
+        animation_indicies_hashmap.insert(*movement, [index, animation_sprite_handles.len()]);
         index += animation_sprite_handles.len();
     }
     let texture_atlas = atlas_builder.finish(&mut textures).unwrap();
-    let texture_atlas_handle = texture_atlases.add(texture_atlas);
+    let texture_atlas_handle = texture_atlases.add(texture_atlas.clone());
     commands.insert_resource(AnimationIndicies{indicies : animation_indicies_hashmap});
     assert!(index == sprite_count);
 
@@ -229,6 +229,13 @@ fn setup_game(
         texture_atlas: texture_atlas_handle,
         sprite: TextureAtlasSprite::default(),
         ..default()};
+
+    //spawn texture_atlas
+    commands.spawn((SpriteBundle {
+        texture: texture_atlas.texture.clone(),
+        transform: Transform::from_xyz(0.0, 0.0, 1.0),
+        ..default()
+    },));
 
     //player1
     commands.spawn((PlayerBundle{sprite : sprite_sheet_bundle, ..default()},
@@ -253,13 +260,13 @@ fn player_control(mut query: Query<(&Player,
                         *movement = Movement::Docking;
                         velocity.x = 0.0;
                     } else if keyboard_input.pressed(KeyCode::A) {
-                        *movement = Movement::Walking;
+                        if *movement!=Movement::Walking {*movement = Movement::Walking;}
                         velocity.x = -WALKING_SPEED;
                     } else if keyboard_input.pressed(KeyCode::D) {
-                        *movement = Movement::Walking;
+                        if *movement!=Movement::Walking {*movement = Movement::Walking;}
                         velocity.x = WALKING_SPEED;
                     } else {
-                        *movement = Movement::Idle;
+                        if *movement!=Movement::Idle {*movement = Movement::Idle;}
                         velocity.x = 0.0;
                     }
                 }
@@ -282,9 +289,11 @@ fn update_motion(mut query: Query<(&mut Position,
         position.y = (position.y + dt*velocity.y).clamp(FLOOR_Y, CEILING_Y);
 
         if position.y <= FLOOR_Y {
-            *movement = Movement::Idle;
-            velocity.y = 0.0;
-            position.y = FLOOR_Y;
+            if *movement != Movement::Idle {
+                *movement = Movement::Idle;
+                velocity.y = 0.0;
+                position.y = FLOOR_Y;
+            }
         } else {
             assert!(*movement == Movement::JumpLoop);
             velocity.y = velocity.y + GRAVITY * dt;
@@ -309,11 +318,10 @@ fn draw_fighters(time: Res<Time>,
         
         animation_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
         if animation_timer.just_finished() {
-            if movement.is_changed() {
-                sprite.index = animation_indicies.indicies.get(movement.into_inner()).unwrap()[0];
-            } else {
-                sprite.index = (sprite.index + 1) % animation_indicies.indicies.get(movement.into_inner()).unwrap()[1];
-            }
+            let movement_indicies = animation_indicies.indicies.get(&movement).unwrap();
+            sprite.index = sprite.index.max(movement_indicies[0]);
+            sprite.index = ((sprite.index - movement_indicies[0] + 1) % movement_indicies[1]) + movement_indicies[0];
+            info!("sprite index is now {}", sprite.index);
         }
         
         transform.translation = Vec3::new(position.x, position.y, 0.0);
