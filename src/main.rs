@@ -27,7 +27,7 @@ fn main() {
     )
     .add_systems(
         Update,
-        (update_motion,
+        (update_state,
                  draw_fighters).run_if(in_state(AppState::InGame)),
     )
     .add_systems(Update, bevy::window::close_on_esc)
@@ -98,7 +98,8 @@ struct PlayerBundle{
 struct AnimationTimer(Timer);
 
 #[derive(Resource)]
-struct AnimationImageHandles{image_handles : HashMap<Movement, Vec<Handle<Image>>>,}
+struct AnimationImageHandles
+    {image_handles : HashMap<Movement, Vec<Handle<Image>>>,}
 
 #[derive(Resource)]
 struct AnimationIndicies{indicies : HashMap<Movement, [usize;2]>,}
@@ -106,7 +107,7 @@ struct AnimationIndicies{indicies : HashMap<Movement, [usize;2]>,}
 fn load_textures(mut commands: Commands,
                  asset_server: Res<AssetServer>,) {
 
-    let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::new();
+let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::new();
 
     let animations = vec!(
                  ("Idle",Movement::Idle),
@@ -118,7 +119,7 @@ fn load_textures(mut commands: Commands,
 
     for (animation_name, animation_type) in animations {
         let mut image_handles: Vec<Handle<Image>> = Vec::new();
-        let texture_folder_path = format!("textures/{}", animation_name);
+        let texture_folder_path = format!("textures/IDF/{}", animation_name);
         let untyped_handles = asset_server.load_folder(texture_folder_path).unwrap();
         for handle in untyped_handles.iter() {
             let image_handle: Handle<Image> = handle.clone().typed();
@@ -235,10 +236,10 @@ fn setup_game(
                                         position : Position{x : LEFT_WALL_X + 200.0, y :0.0},
                                         ..default()});
     //player2
-    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
-                                        player : Player::Player2,
-                                        position : Position{x : RIGHT_WALL_X - 200.0, y :0.0},
-                                        ..default()});
+    // commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
+    //                                     player : Player::Player2,
+    //                                     position : Position{x : RIGHT_WALL_X - 200.0, y :0.0},
+    //                                     ..default()});
     commands.insert_resource(AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating)));
 }
 
@@ -274,7 +275,7 @@ fn player_control(mut query: Query<(&Player,
         }
 }}
 
-fn update_motion(mut query: Query<(&mut Position,
+fn update_state(mut query: Query<(&mut Position,
                                       &mut Velocity,
                                       &mut Movement)>,
                                       time: Res<Time>,) {

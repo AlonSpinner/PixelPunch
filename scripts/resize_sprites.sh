@@ -9,22 +9,30 @@ fi
 # Directory path
 DIR="$1"
 
-# Create a temporary file name
-TMP_FILE=$(mktemp "${TMPDIR:-/tmp}/tempfile.XXXXXXXXXX.png")
-
 # Find and resize all .png files recursively
 find "$DIR" -type f -name "*.png" | while IFS= read -r file; do
+    if [[ ! "$file" == .* ]]; then
+        file=".$file"
+    fi
+
     if [ ! -f "$file" ]; then
         echo "Warning: Unable to find file '$file'. Skipping."
         continue
     fi
 
+    # Extract filename from the path
+    FILENAME=$(basename "$file")
+
+    # Create a temporary file name in the /tmp directory with the same filename as the original
+    TMP_FILE="${TMPDIR:-/tmp}/$FILENAME"
+
     echo "Resizing $file..."
-    ffmpeg -i "$file" -vf "scale=100:100:flags=neighbor" -f image2 "$TMP_FILE"
+    ffmpeg -y -i "$file" -vf "scale=100:100:flags=neighbor" "$TMP_FILE"
     
     # Check if ffmpeg was successful
-    if [ ! -f "$TMP_FILE" ]; then
+    if [ $? -ne 0 ]; then
         echo "Warning: Resizing failed for '$file'. Skipping."
+        rm -f "$TMP_FILE"  # Remove the potentially corrupted temp file
         continue
     fi
     
