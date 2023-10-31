@@ -11,7 +11,6 @@ const CEILING_Y : f32 = 300.0;
 const FLOOR_Y : f32 = -300.0;
 const LEFT_WALL_X : f32 = -450.0;
 const RIGHT_WALL_X : f32 = 450.0;
-const SPRITE_WIDTH_HEIGHT : f32 = 100.0;
 const ANIMATION_TIME : f32 = 0.1;
 
 fn main() {
@@ -95,7 +94,7 @@ struct PlayerBundle{
     sprite: SpriteSheetBundle,
 }
 
-#[derive(Component, Deref, DerefMut)]
+#[derive(Resource, Deref, DerefMut)]
 struct AnimationTimer(Timer);
 
 #[derive(Resource)]
@@ -231,9 +230,16 @@ fn setup_game(
         ..default()};
 
     //player1
-    commands.spawn((PlayerBundle{sprite : sprite_sheet_bundle, ..default()},
-    AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating))
-    ));
+    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
+                                        player : Player::Player1,
+                                        position : Position{x : LEFT_WALL_X + 200.0, y :0.0},
+                                        ..default()});
+    //player2
+    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
+                                        player : Player::Player2,
+                                        position : Position{x : RIGHT_WALL_X - 200.0, y :0.0},
+                                        ..default()});
+    commands.insert_resource(AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating)));
 }
 
 fn player_control(mut query: Query<(&Player,
@@ -282,11 +288,9 @@ fn update_motion(mut query: Query<(&mut Position,
         position.y = (position.y + dt*velocity.y).clamp(FLOOR_Y, CEILING_Y);
 
         if position.y <= FLOOR_Y {
-            if *movement != Movement::Idle {
-                *movement = Movement::Idle;
-                velocity.y = 0.0;
-                position.y = FLOOR_Y;
-            }
+            if *movement != Movement::Idle {*movement = Movement::Idle;}
+            velocity.y = 0.0;
+            position.y = FLOOR_Y;
         } else {
             assert!(*movement == Movement::JumpLoop);
             velocity.y = velocity.y + GRAVITY * dt;
@@ -296,16 +300,15 @@ fn update_motion(mut query: Query<(&mut Position,
 
 fn draw_fighters(time: Res<Time>,
                 animation_indicies: Res<AnimationIndicies>,
+                mut animation_timer: ResMut<AnimationTimer>,
                 mut query: Query<(&Position,
                                &Velocity,
                                Ref<Movement>,
-                               &mut AnimationTimer,
                                &mut TextureAtlasSprite,
                                &mut Transform,)>) {
     for (position,
          velocity,
          movement,
-         mut animation_timer,
          mut sprite,
          mut transform) in query.iter_mut() {
         
@@ -314,7 +317,6 @@ fn draw_fighters(time: Res<Time>,
             let movement_indicies = animation_indicies.indicies.get(&movement).unwrap();
             sprite.index = sprite.index.max(movement_indicies[0]);
             sprite.index = ((sprite.index - movement_indicies[0] + 1) % movement_indicies[1]) + movement_indicies[0];
-            info!("sprite index is now {}", sprite.index);
         }
         
         transform.translation = Vec3::new(position.x, position.y, 0.0);
