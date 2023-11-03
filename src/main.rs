@@ -2,6 +2,7 @@ use bevy::{prelude::*, asset::LoadState};
 use bevy_tile_atlas::TileAtlasBuilder;
 use std::collections::HashMap;
 use std::time::Duration;
+use std::path::PathBuf;
 
 const WALKING_SPEED : f32 = 100.0;
 const RUNNING_SPEED : f32 = 100.0;
@@ -17,7 +18,7 @@ fn main() {
     App::new()
     .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
     .add_state::<AppState>()
-    .add_systems(OnEnter(AppState::Setup), load_textures)
+    .add_systems(OnEnter(AppState::Setup), load_resources)
     .add_systems(Update, check_textures_loaded.run_if(in_state(AppState::Setup)))
     
     .add_systems(OnEnter(AppState::InGame), setup_game)
@@ -72,15 +73,20 @@ enum Fighter{
     IDF,
     HAMAS,
 }
+impl std::fmt::Display for Fighter {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            Fighter::IDF => write!(f, "IDF"),
+            Fighter::HAMAS => write!(f, "HAMAS"),
+        }
+    }
+}
 
 #[derive(Component)]
 enum Player{
     Player1,
     Player2,
 }
-
-#[derive(Component)]
-struct ChangedMovement(bool);
 
 #[derive(Bundle)]
 struct PlayerBundle{
@@ -104,10 +110,9 @@ struct AnimationImageHandles
 #[derive(Resource)]
 struct AnimationIndicies{indicies : HashMap<Movement, [usize;2]>,}
 
-fn load_textures(mut commands: Commands,
+fn load_resources(mut commands: Commands,
                  asset_server: Res<AssetServer>,) {
-
-let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::new();
+    //system to load sprites and built texture atlas for each fighter of the two fighters
 
     let animations = vec!(
                  ("Idle",Movement::Idle),
@@ -116,24 +121,40 @@ let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::n
                  ("Running",Movement::Running),
                  ("JumpLoop",Movement::JumpLoop),
                 );
+    let fighter = Fighter::IDF;
 
-    for (animation_name, animation_type) in animations {
+    
+    let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::new();
+    for (animation_name, animation_type) in &animations {
         let mut image_handles: Vec<Handle<Image>> = Vec::new();
-        let texture_folder_path = format!("textures/IDF/{}", animation_name);
-        let untyped_handles = asset_server.load_folder(texture_folder_path).unwrap();
+        let path = PathBuf::from("textures").join(fighter.to_string()).join(animation_name);
+        let untyped_handles = asset_server.load_folder(path).unwrap();
         for handle in untyped_handles.iter() {
             let image_handle: Handle<Image> = handle.clone().typed();
             image_handles.push(image_handle);
         }
-        image_handle_hashmap.insert(animation_type, image_handles);
+        image_handle_hashmap.insert(*animation_type, image_handles);
     }
+    commands.insert_resource(AnimationImageHandles{image_handles : image_handle_hashmap});
 
+    let fighter = Fighter::HAMAS;
+    let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::new();
+    for (animation_name, animation_type) in &animations {
+        let mut image_handles: Vec<Handle<Image>> = Vec::new();
+        let path = PathBuf::from("textures").join(fighter.to_string()).join(animation_name);
+        let untyped_handles = asset_server.load_folder(path).unwrap();
+        for handle in untyped_handles.iter() {
+            let image_handle: Handle<Image> = handle.clone().typed();
+            image_handles.push(image_handle);
+        }
+        image_handle_hashmap.insert(*animation_type, image_handles);
+    }
     commands.insert_resource(AnimationImageHandles{image_handles : image_handle_hashmap});
 }
 
 fn check_textures_loaded(
     mut next_state: ResMut<NextState<AppState>>,
-    animation_hashmap: ResMut<AnimationImageHandles>,
+    animation_hashmap: Res<AnimationImageHandles>,
     asset_server: Res<AssetServer>,
 ) {
     let mut all_loaded = true;
