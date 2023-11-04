@@ -1,6 +1,9 @@
+use bevy::sprite;
 use bevy::{prelude::*, asset::LoadState};
 use bevy_tile_atlas::TileAtlasBuilder;
+use strum_macros::{EnumString, Display};
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::time::Duration;
 use std::path::PathBuf;
 
@@ -18,7 +21,7 @@ fn main() {
     App::new()
     .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
     .add_state::<AppState>()
-    .add_systems(OnEnter(AppState::Setup), load_resources)
+    .add_systems(OnEnter(AppState::Setup), load_assets)
     .add_systems(Update, check_textures_loaded.run_if(in_state(AppState::Setup)))
     
     .add_systems(OnEnter(AppState::InGame), setup_game)
@@ -54,30 +57,41 @@ struct Velocity {
     x : f32,
     y : f32,
 }
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum Movement{
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, Display)]
+enum FighterMovement {
     Idle,
+    #[strum(serialize = "JumpLoop")]
     JumpLoop,
+    #[strum(serialize = "Sliding")]
     Docking,
     Running,
     Walking,
 }
+
 #[derive(Component)]
 enum Stance{
     Defending,
     Attacking,
     Idle,
 }
-#[derive(Component)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
 enum Fighter{
     IDF,
     HAMAS,
 }
-impl std::fmt::Display for Fighter {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Fighter {
+    fn movements(&self) -> Vec<FighterMovement> {
         match *self {
-            Fighter::IDF => write!(f, "IDF"),
-            Fighter::HAMAS => write!(f, "HAMAS"),
+            Fighter::IDF => vec!(FighterMovement::Idle,
+                                 FighterMovement::JumpLoop,
+                                 FighterMovement::Docking,
+                                 FighterMovement::Running,
+                                 FighterMovement::Walking),
+            Fighter::HAMAS => vec!(FighterMovement::Idle,
+                                 FighterMovement::JumpLoop,
+                                 FighterMovement::Docking,
+                                 FighterMovement::Running,
+                                 FighterMovement::Walking),
         }
     }
 }
@@ -95,7 +109,7 @@ struct PlayerBundle{
     health: Health,
     position: Position,
     velocity: Velocity,
-    movement: Movement,
+    movement: FighterMovement,
     stance: Stance,
     sprite: SpriteSheetBundle,
 }
@@ -104,84 +118,87 @@ struct PlayerBundle{
 struct AnimationTimer(Timer);
 
 #[derive(Resource)]
-struct AnimationImageHandles
-    {image_handles : HashMap<Movement, Vec<Handle<Image>>>,}
+struct AssetLoading {
+    fighters_movement_sprites: HashMap<Fighter, HashMap<FighterMovement, Vec<Handle<Image>>>>,
+    background_sprites: Vec<Handle<Image>>,
+}
 
+struct FighterAnimationHash {
+    hashmap: HashMap<FighterMovement, [usize;2]>,
+    atlas_handle: Handle<TextureAtlas>,
+}
 #[derive(Resource)]
-struct AnimationIndicies{indicies : HashMap<Movement, [usize;2]>,}
+struct FightersMovementAnimationIndicies(HashMap<Fighter,FighterAnimationHash>);
 
-fn load_resources(mut commands: Commands,
-                 asset_server: Res<AssetServer>,) {
-    //system to load sprites and built texture atlas for each fighter of the two fighters
+fn load_assets(mut commands: Commands,
+                 asset_server: Res<AssetServer>) {
 
-    let animations = vec!(
-                 ("Idle",Movement::Idle),
-                 ("Sliding",Movement::Docking),
-                 ("Walking",Movement::Walking),
-                 ("Running",Movement::Running),
-                 ("JumpLoop",Movement::JumpLoop),
-                );
-    let fighter = Fighter::IDF;
+    let mut assets = AssetLoading {
+        fighters_movement_sprites: HashMap::new(),
+        background_sprites: Vec::new(),
+    };
 
-    
-    let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::new();
-    for (animation_name, animation_type) in &animations {
-        let mut image_handles: Vec<Handle<Image>> = Vec::new();
-        let path = PathBuf::from("textures").join(fighter.to_string()).join(animation_name);
-        let untyped_handles = asset_server.load_folder(path).unwrap();
-        for handle in untyped_handles.iter() {
-            let image_handle: Handle<Image> = handle.clone().typed();
-            image_handles.push(image_handle);
+    //load background sprites
+    assets.background_sprites.push(asset_server.load("background.png"));
+
+    //load fighter sprites
+    let fighters = vec!(Fighter::IDF, Fighter::HAMAS);
+    for fighter in fighters {
+        let mut fighter_movement_sprites: HashMap<FighterMovement,Vec<Handle<Image>>> = HashMap::new();
+        for movement in fighter.movements() {
+            let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
+            let path = PathBuf::from("textures").join(fighter.to_string()).join(movement.to_string());
+            info!("Loading textures from {:?}", path);
+            let untyped_handles = asset_server.load_folder(path).unwrap();
+            for handle in untyped_handles.iter() {
+                let image_handle = handle.clone().typed();
+                sprites_vec.push(image_handle);
+            }
+        fighter_movement_sprites.insert(movement, sprites_vec);
         }
-        image_handle_hashmap.insert(*animation_type, image_handles);
+        assets.fighters_movement_sprites.insert(fighter, fighter_movement_sprites);
     }
-    commands.insert_resource(AnimationImageHandles{image_handles : image_handle_hashmap});
-
-    let fighter = Fighter::HAMAS;
-    let mut image_handle_hashmap: HashMap<Movement, Vec<Handle<Image>>> = HashMap::new();
-    for (animation_name, animation_type) in &animations {
-        let mut image_handles: Vec<Handle<Image>> = Vec::new();
-        let path = PathBuf::from("textures").join(fighter.to_string()).join(animation_name);
-        let untyped_handles = asset_server.load_folder(path).unwrap();
-        for handle in untyped_handles.iter() {
-            let image_handle: Handle<Image> = handle.clone().typed();
-            image_handles.push(image_handle);
-        }
-        image_handle_hashmap.insert(*animation_type, image_handles);
-    }
-    commands.insert_resource(AnimationImageHandles{image_handles : image_handle_hashmap});
+    commands.insert_resource(assets);
 }
 
 fn check_textures_loaded(
     mut next_state: ResMut<NextState<AppState>>,
-    animation_hashmap: Res<AnimationImageHandles>,
     asset_server: Res<AssetServer>,
-) {
-    let mut all_loaded = true;
-
-    for movement in animation_hashmap.image_handles.keys() {
-        let animation_sprite_handles = animation_hashmap.image_handles.get(movement).unwrap();
-        for handle in animation_sprite_handles {
-            let load_state = asset_server.get_load_state(handle);
-            match load_state {
-                LoadState::Loaded => continue,
-                LoadState::NotLoaded | LoadState::Loading => {
-                    all_loaded = false;
-                    break;
-                }
-                LoadState::Failed => {
-                    panic!("Failed to load sprite");
-                }
-                _ => {
-                    panic!("Unexpected load state");
+    asset_loading: Res<AssetLoading>,
+) { 
+    for sprite_handles in asset_loading.background_sprites.iter() {
+        let sprite_load_state = asset_server.get_load_state(sprite_handles);
+        match sprite_load_state {
+            LoadState::Loaded => {}
+            LoadState::NotLoaded | LoadState::Loading => {return;}
+            LoadState::Failed => {
+                panic!("Failed to load sprite");
+            }
+            _ => {
+                panic!("Unexpected load state");
+            }
+        }
+    }
+    
+    for (_, movement_sprites_handles) in asset_loading.fighters_movement_sprites.iter() {
+        for (_, sprites_handles) in movement_sprites_handles.iter() {
+            for sprite_handle in sprites_handles.iter() {
+                let sprite_load_state = asset_server.get_load_state(sprite_handle);
+                match sprite_load_state {
+                    LoadState::Loaded => {}
+                    LoadState::NotLoaded | LoadState::Loading => {return;}
+                    LoadState::Failed => {
+                        panic!("Failed to load sprite");
+                    }
+                    _ => {
+                        panic!("Unexpected load state");
+                    }
                 }
             }
         }
     }
-
-    if all_loaded {
-        next_state.set(AppState::InGame);
-    }
+    next_state.set(AppState::InGame);
+    info!("all assets loaded")
 }
 
 impl Default for PlayerBundle {
@@ -192,7 +209,7 @@ impl Default for PlayerBundle {
             health : Health(100.0),
             position : Position{x : 0.0, y :0.0},
             velocity : Velocity{x : 0.0, y :0.0},
-            movement : Movement::JumpLoop,
+            movement : FighterMovement::JumpLoop,
             stance : Stance::Idle,
             sprite : SpriteSheetBundle::default(),
         }
@@ -201,10 +218,9 @@ impl Default for PlayerBundle {
 
 fn setup_game(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut textures: ResMut<Assets<Image>>,
-    animation_hashmap: Res<AnimationImageHandles>,
+    asset_loading: Res<AssetLoading>,
     mut windows: Query<&mut Window>) {
     
     commands.spawn(Camera2dBundle::default());
@@ -212,9 +228,9 @@ fn setup_game(
     //background
     let mut window = windows.single_mut();
     window.title = "pixel punch".into();
-    let texture_handle = asset_server.load("background.png");    
+    let background_handle = asset_loading.background_sprites[0].clone();  
     commands.spawn(SpriteBundle {
-        texture: texture_handle,
+        texture: background_handle,
         sprite: Sprite {
             custom_size: Some(Vec2::new(window.width(), window.height())),
             ..default()},
@@ -222,50 +238,57 @@ fn setup_game(
         ..default()
     });
 
-    //fighters
-    let mut sprite_count = 0;
-    for animation_type in animation_hashmap.image_handles.keys() {
-        let animation_sprite_handles = animation_hashmap.image_handles.get(animation_type).unwrap();
-        sprite_count += animation_sprite_handles.len();
-    }
-
-    let mut atlas_builder = TileAtlasBuilder::default();
-    
-    let mut animation_indicies_hashmap: HashMap<Movement, [usize;2]> = HashMap::new();
-    let mut index = 0;
-    for movement in animation_hashmap.image_handles.keys() {
-        let animation_sprite_handles = animation_hashmap.image_handles.get(movement).unwrap();
-        for handle in animation_sprite_handles {
-            atlas_builder.add_texture(handle.clone(), textures.get(handle).unwrap()).unwrap();
+    //build texture atlases for all fighters
+    let mut fighters_movement_animation_indicies = FightersMovementAnimationIndicies(HashMap::new());
+    for (fighter, movement_sprites_handles) in asset_loading.fighters_movement_sprites.iter() {
+        let mut atlas_builder: TileAtlasBuilder = TileAtlasBuilder::default();
+        let mut movement_indicies: HashMap<FighterMovement, [usize;2]> = HashMap::new();
+        let mut index : usize = 0;
+        for (movement, sprites_handles) in movement_sprites_handles.iter() {
+            for sprite_handle in sprites_handles.iter() {
+                atlas_builder.add_texture(sprite_handle.clone(), textures.get(&sprite_handle).unwrap()).unwrap();
+            }
+            movement_indicies.insert(movement.clone(), [index, index + sprites_handles.len()-1]);
+            index += sprites_handles.len();
         }
-        animation_indicies_hashmap.insert(*movement, [index, animation_sprite_handles.len()]);
-        index += animation_sprite_handles.len();
+        let texture_atlas_handle = texture_atlases.add(atlas_builder.finish(&mut textures).unwrap());
+        let fighter_animation_hash = FighterAnimationHash{hashmap : movement_indicies, atlas_handle : texture_atlas_handle};
+        fighters_movement_animation_indicies.0.insert(*fighter, fighter_animation_hash);
     }
-    let texture_atlas = atlas_builder.finish(&mut textures).unwrap();
-    let texture_atlas_handle = texture_atlases.add(texture_atlas.clone());
-    commands.insert_resource(AnimationIndicies{indicies : animation_indicies_hashmap});
-    assert!(index == sprite_count);
-
-    let sprite_sheet_bundle = SpriteSheetBundle {
-        texture_atlas: texture_atlas_handle,
-        sprite: TextureAtlasSprite::default(),
-        ..default()};
 
     //player1
+    let player = Player::Player1;
+    let fighter = Fighter::IDF;
+    let sprite_sheet_bundle = SpriteSheetBundle {
+        texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
+        sprite: TextureAtlasSprite::default(),
+        ..default()};
     commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
-                                        player : Player::Player1,
+                                        player : player,
+                                        fighter : fighter,
                                         position : Position{x : LEFT_WALL_X + 200.0, y :0.0},
                                         ..default()});
-    //player2
-    // commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
-    //                                     player : Player::Player2,
-    //                                     position : Position{x : RIGHT_WALL_X - 200.0, y :0.0},
-    //                                     ..default()});
+
+    //player1
+    let player = Player::Player2;
+    let fighter = Fighter::HAMAS;
+    let sprite_sheet_bundle = SpriteSheetBundle {
+        texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
+        sprite: TextureAtlasSprite{flip_x : true, ..default()},
+        ..default()};
+    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
+                                        player : player,
+                                        fighter : fighter,
+                                        position : Position{x : RIGHT_WALL_X - 200.0, y :0.0},
+                                        ..default()});
+    
+    //insert resources
     commands.insert_resource(AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating)));
+    commands.insert_resource(fighters_movement_animation_indicies);
 }
 
 fn player_control(mut query: Query<(&Player,
-                                    &mut Movement,
+                                    &mut FighterMovement,
                                     &mut Velocity)>,
         keyboard_input: Res<Input<KeyCode>>) {
     for (player,
@@ -273,21 +296,21 @@ fn player_control(mut query: Query<(&Player,
         mut velocity) in query.iter_mut() {
         match player {
             Player::Player1 => {
-                if *movement != Movement::JumpLoop {
+                if *movement != FighterMovement::JumpLoop {
                     if keyboard_input.just_pressed(KeyCode::W) {
-                        *movement = Movement::JumpLoop;
+                        *movement = FighterMovement::JumpLoop;
                         velocity.y = JUMPING_SPEED;
                     } else if keyboard_input.pressed(KeyCode::S) {
-                        *movement = Movement::Docking;
+                        *movement = FighterMovement::Docking;
                         velocity.x = 0.0;
                     } else if keyboard_input.pressed(KeyCode::A) {
-                        if *movement!=Movement::Walking {*movement = Movement::Walking;}
+                        if *movement!=FighterMovement::Walking {*movement = FighterMovement::Walking;}
                         velocity.x = -WALKING_SPEED;
                     } else if keyboard_input.pressed(KeyCode::D) {
-                        if *movement!=Movement::Walking {*movement = Movement::Walking;}
+                        if *movement!=FighterMovement::Walking {*movement = FighterMovement::Walking;}
                         velocity.x = WALKING_SPEED;
                     } else {
-                        if *movement!=Movement::Idle {*movement = Movement::Idle;}
+                        if *movement!=FighterMovement::Idle {*movement = FighterMovement::Idle;}
                         velocity.x = 0.0;
                     }
                 }
@@ -298,7 +321,7 @@ fn player_control(mut query: Query<(&Player,
 
 fn update_state(mut query: Query<(&mut Position,
                                       &mut Velocity,
-                                      &mut Movement)>,
+                                      &mut FighterMovement)>,
                                       time: Res<Time>,) {
     let dt = time.delta_seconds();
     
@@ -310,25 +333,27 @@ fn update_state(mut query: Query<(&mut Position,
         position.y = (position.y + dt*velocity.y).clamp(FLOOR_Y, CEILING_Y);
 
         if position.y <= FLOOR_Y {
-            if *movement != Movement::Idle {*movement = Movement::Idle;}
+            if *movement != FighterMovement::Idle {*movement = FighterMovement::Idle;}
             velocity.y = 0.0;
             position.y = FLOOR_Y;
         } else {
-            assert!(*movement == Movement::JumpLoop);
+            assert!(*movement == FighterMovement::JumpLoop);
             velocity.y = velocity.y + GRAVITY * dt;
         }
     }
 }
 
 fn draw_fighters(time: Res<Time>,
-                animation_indicies: Res<AnimationIndicies>,
+                fighters_movement_animation_indicies: Res<FightersMovementAnimationIndicies>,
                 mut animation_timer: ResMut<AnimationTimer>,
-                mut query: Query<(&Position,
+                mut query: Query<(&Fighter,
+                               &Position,
                                &Velocity,
-                               Ref<Movement>,
+                               Ref<FighterMovement>,
                                &mut TextureAtlasSprite,
                                &mut Transform,)>) {
-    for (position,
+    for (fighter,
+         position,
          velocity,
          movement,
          mut sprite,
@@ -336,9 +361,13 @@ fn draw_fighters(time: Res<Time>,
         
         animation_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
         if animation_timer.just_finished() {
-            let movement_indicies = animation_indicies.indicies.get(&movement).unwrap();
-            sprite.index = sprite.index.max(movement_indicies[0]);
-            sprite.index = ((sprite.index - movement_indicies[0] + 1) % movement_indicies[1]) + movement_indicies[0];
+            let movement_indicies = fighters_movement_animation_indicies.0.get(&fighter).unwrap()
+                                                                                .hashmap.get(&movement).unwrap();
+            if sprite.index < movement_indicies[0] || sprite.index > movement_indicies[1]-1 {
+                sprite.index = movement_indicies[0];
+            } else {
+                sprite.index += 1;
+            }
         }
         
         transform.translation = Vec3::new(position.x, position.y, 0.0);
