@@ -1,4 +1,3 @@
-use bevy::sprite;
 use bevy::{prelude::*, asset::LoadState};
 use bevy_tile_atlas::TileAtlasBuilder;
 use strum_macros::{EnumString, Display};
@@ -8,7 +7,7 @@ use std::time::Duration;
 use std::path::PathBuf;
 
 const WALKING_SPEED : f32 = 100.0;
-const RUNNING_SPEED : f32 = 100.0;
+const RUNNING_SPEED : f32 = 200.0;
 const GRAVITY : f32 = -100.0;
 const JUMPING_SPEED : f32 = 100.0;
 const CEILING_Y : f32 = 300.0;
@@ -110,25 +109,40 @@ enum Player{
     Player2,
 }
 
+struct PlayerKeyControl{key : KeyCode, last_press : f64}
+
 #[derive(Component)]
 struct PlayerControls{
-    up : KeyCode,
-    down : KeyCode,
-    left : KeyCode,
-    right : KeyCode,
-    attack : KeyCode,
-    defend : KeyCode,
+    up : PlayerKeyControl,
+    down : PlayerKeyControl,
+    left : PlayerKeyControl,
+    right : PlayerKeyControl,
+    attack : PlayerKeyControl,
+    defend : PlayerKeyControl,
+}
+
+impl From<HashMap<&str, KeyCode>> for PlayerControls {
+    fn from(mut hashmap: HashMap<&str, KeyCode>) -> Self {
+        Self{
+            up : PlayerKeyControl{key: hashmap.remove("up").unwrap(), last_press: 0.0},
+            down : PlayerKeyControl{key: hashmap.remove("down").unwrap(), last_press: 0.0},
+            left : PlayerKeyControl{key: hashmap.remove("left").unwrap(), last_press: 0.0},
+            right : PlayerKeyControl{key: hashmap.remove("right").unwrap(), last_press: 0.0},
+            attack: PlayerKeyControl{key: hashmap.remove("attack").unwrap(), last_press: 0.0},
+            defend: PlayerKeyControl{key: hashmap.remove("defend").unwrap(), last_press: 0.0},
+        }
+    }
 }
 
 impl Default for PlayerControls {
     fn default() -> Self {
         Self{
-            up : KeyCode::W,
-            down : KeyCode::S,
-            left : KeyCode::A,
-            right : KeyCode::D,
-            attack : KeyCode::G,
-            defend : KeyCode::H,
+            up : PlayerKeyControl{key: KeyCode::W, last_press: 0.0},
+            down : PlayerKeyControl{key: KeyCode::S, last_press: 0.0},
+            left : PlayerKeyControl{key: KeyCode::A, last_press: 0.0},
+            right : PlayerKeyControl{key: KeyCode::D, last_press: 0.0},
+            attack: PlayerKeyControl{key: KeyCode::F, last_press: 0.0},
+            defend: PlayerKeyControl{key: KeyCode::G, last_press: 0.0},
         }
     }
 }
@@ -304,12 +318,13 @@ fn setup_game(
     //player2
     let player = Player::Player2;
     let fighter = Fighter::HAMAS;
-    let player2_controls = PlayerControls{up : KeyCode::Up,
-                                          down : KeyCode::Down,
-                                          left : KeyCode::Left,
-                                          right : KeyCode::Right,
-                                          attack : KeyCode::J,
-                                          defend : KeyCode::K};
+    let player2_controls = PlayerControls::from(HashMap::from([
+                                                            ("up", KeyCode::Up),
+                                                            ("down", KeyCode::Down),
+                                                            ("left", KeyCode::Left),
+                                                            ("right", KeyCode::Right),
+                                                            ("attack", KeyCode::ShiftRight),
+                                                            ("defend", KeyCode::Return)]));
     let sprite_sheet_bundle = SpriteSheetBundle {
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
         sprite: TextureAtlasSprite{flip_x : true, ..default()},
@@ -326,26 +341,43 @@ fn setup_game(
     commands.insert_resource(fighters_movement_animation_indicies);
 }
 
-fn player_control(mut query: Query<(&PlayerControls,
+fn player_control(mut query: Query<(&mut PlayerControls,
                                     &mut FighterMovement,
                                     &mut Velocity)>,
-        keyboard_input: Res<Input<KeyCode>>) {
-    for (player_controls,
+                            keyboard_input: Res<Input<KeyCode>>,
+                            time : Res<Time>) {
+    
+    let double_tap_duration = Duration::from_millis(500).as_secs_f64();
+    let time_elapsed = time.elapsed_seconds_f64();
+    for (mut player_controls,
         mut movement,
         mut velocity) in query.iter_mut() {
         if *movement != FighterMovement::JumpLoop {
-            if keyboard_input.just_pressed(player_controls.up) {
+            if keyboard_input.just_pressed(player_controls.up.key) {
                 movement.change_to(FighterMovement::JumpLoop);
                 velocity.y = JUMPING_SPEED;
-            } else if keyboard_input.pressed(player_controls.down) {
+            } else if keyboard_input.pressed(player_controls.down.key) {
                 movement.change_to(FighterMovement::Docking);
                 velocity.x = 0.0;
-            } else if keyboard_input.pressed(player_controls.left) {
-                movement.change_to(FighterMovement::Walking);
-                velocity.x = -WALKING_SPEED;
-            } else if keyboard_input.pressed(player_controls.right) {
-                movement.change_to(FighterMovement::Walking);
-                velocity.x = WALKING_SPEED;
+            } else if keyboard_input.pressed(player_controls.right.key) {
+                if keyboard_input.just_pressed(player_controls.right.key) && 
+                        (time_elapsed - player_controls.right.last_press) < double_tap_duration {
+                    movement.change_to(FighterMovement::Running);
+                    velocity.x = RUNNING_SPEED;
+                } else if *movement != FighterMovement::Running{
+                    movement.change_to(FighterMovement::Walking);
+                    velocity.x = WALKING_SPEED;
+                }
+                player_controls.right.last_press = time_elapsed;
+            } else if keyboard_input.pressed(player_controls.left.key) {
+                if time_elapsed - player_controls.left.last_press < double_tap_duration {
+                    movement.change_to(FighterMovement::Running);
+                    velocity.x = -RUNNING_SPEED;
+                } else {
+                    movement.change_to(FighterMovement::Walking);
+                    velocity.x = -WALKING_SPEED;
+                }
+                player_controls.left.last_press = time_elapsed;
             } else {
                 movement.change_to(FighterMovement::Idle);
                 velocity.x = 0.0;
