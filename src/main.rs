@@ -1,10 +1,14 @@
 use bevy::{prelude::*, asset::LoadState};
 use bevy_tile_atlas::TileAtlasBuilder;
-use strum_macros::{EnumString, Display};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 use std::path::PathBuf;
+
+pub mod fighters;
+use fighters::{Fighter, FighterMovement};
+pub mod controls;
+use controls::{PlayerControls, PlayerKeyControl};
 
 const WALKING_SPEED : f32 = 100.0;
 const RUNNING_SPEED : f32 = 200.0;
@@ -56,83 +60,11 @@ struct Velocity {
     x : f32,
     y : f32,
 }
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, Display)]
-enum FighterMovement {
-    Idle,
-    #[strum(serialize = "JumpLoop")]
-    JumpLoop,
-    #[strum(serialize = "Sliding")]
-    Docking,
-    Running,
-    Walking,
-}
-impl FighterMovement {
-    fn change_to(&mut self, new_movement: FighterMovement) {
-        //only change if new movement is different to allow Bevy's change detection to work
-        if &new_movement != self {
-            *self = new_movement;
-            info!("movement changed to {:?}", self)
-        }
-    }
-}
-
-#[derive(Component)]
-enum Stance{
-    Defending,
-    Attacking,
-    Idle,
-}
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
-enum Fighter{
-    IDF,
-    HAMAS,
-}
-impl Fighter {
-    fn movements(&self) -> Vec<FighterMovement> {
-        match *self {
-            Fighter::IDF => vec!(FighterMovement::Idle,
-                                 FighterMovement::JumpLoop,
-                                 FighterMovement::Docking,
-                                 FighterMovement::Running,
-                                 FighterMovement::Walking),
-            Fighter::HAMAS => vec!(FighterMovement::Idle,
-                                 FighterMovement::JumpLoop,
-                                 FighterMovement::Docking,
-                                 FighterMovement::Running,
-                                 FighterMovement::Walking),
-        }
-    }
-}
 
 #[derive(Component)]
 enum Player{
     Player1,
     Player2,
-}
-
-struct PlayerKeyControl{key : KeyCode, last_press : f64}
-
-#[derive(Component)]
-struct PlayerControls{
-    up : PlayerKeyControl,
-    down : PlayerKeyControl,
-    left : PlayerKeyControl,
-    right : PlayerKeyControl,
-    attack : PlayerKeyControl,
-    defend : PlayerKeyControl,
-}
-
-impl Default for PlayerControls {
-    fn default() -> Self {
-        Self{
-            up : PlayerKeyControl{key: KeyCode::W, last_press: 0.0},
-            down : PlayerKeyControl{key: KeyCode::S, last_press: 0.0},
-            left : PlayerKeyControl{key: KeyCode::A, last_press: 0.0},
-            right : PlayerKeyControl{key: KeyCode::D, last_press: 0.0},
-            attack: PlayerKeyControl{key: KeyCode::F, last_press: 0.0},
-            defend: PlayerKeyControl{key: KeyCode::G, last_press: 0.0},
-        }
-    }
 }
 
 #[derive(Bundle)]
@@ -143,7 +75,6 @@ struct PlayerBundle{
     position: Position,
     velocity: Velocity,
     movement: FighterMovement,
-    stance: Stance,
     sprite: SpriteSheetBundle,
     controls: PlayerControls,
 }
@@ -157,7 +88,6 @@ impl Default for PlayerBundle {
             position : Position{x : 0.0, y :0.0},
             velocity : Velocity{x : 0.0, y :0.0},
             movement : FighterMovement::JumpLoop,
-            stance : Stance::Idle,
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
         }
