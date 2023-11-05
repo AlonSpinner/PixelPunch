@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use strum_macros::{EnumString, Display};
 use super::controls::PlayerControls;
+use std::collections::HashMap;
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
 pub enum Fighter{
@@ -27,7 +28,6 @@ impl Fighter {
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, Display)]
 pub enum FighterMovement {
     Idle,
-    #[strum(serialize = "JumpLoop")]
     JumpLoop,
     #[strum(serialize = "Sliding")]
     Docking,
@@ -44,19 +44,13 @@ impl FighterMovement {
     }
 }
 
-struct FighterMovementEdge {
-    to : FighterMovementNode,
-    controls : PlayerControls,
-    condition : fn() -> bool,
-}
-
 struct FighterMovementNode {
-    movement : FighterMovement,
-    edges : Vec<FighterMovementEdge>,
+    controls : PlayerControls, //combination of controls pressed to enter this node
+    blocked_nodes : Vec<FighterMovement>, //nodes that cannot be entered from this node
 }
 
 struct FighterMovementGraph {
-    nodes : Vec<FighterMovementNode>,
+    nodes : HashMap<FighterMovement,Vec<FighterMovementNode>>,
     current_node : FighterMovementNode,
 }
 
@@ -65,7 +59,11 @@ impl FighterMovementGraph {
         let mut nodes = Vec::new();
         nodes.push(FighterMovementNode{
             movement : FighterMovement::Idle,
-            edges : 
+            edges : vec!(FighterMovementEdge{
+                            to : FighterMovement::JumpLoop,
+                            controls : PlayerControls::default(),
+                            condition : || true,
+                        }),
         });
         nodes.push(FighterMovementNode{
             movement : FighterMovement::JumpLoop,
