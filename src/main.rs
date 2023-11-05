@@ -71,6 +71,7 @@ impl FighterMovement {
         //only change if new movement is different to allow Bevy's change detection to work
         if &new_movement != self {
             *self = new_movement;
+            info!("movement changed to {:?}", self)
         }
     }
 }
@@ -119,19 +120,6 @@ struct PlayerControls{
     right : PlayerKeyControl,
     attack : PlayerKeyControl,
     defend : PlayerKeyControl,
-}
-
-impl From<HashMap<&str, KeyCode>> for PlayerControls {
-    fn from(mut hashmap: HashMap<&str, KeyCode>) -> Self {
-        Self{
-            up : PlayerKeyControl{key: hashmap.remove("up").unwrap(), last_press: 0.0},
-            down : PlayerKeyControl{key: hashmap.remove("down").unwrap(), last_press: 0.0},
-            left : PlayerKeyControl{key: hashmap.remove("left").unwrap(), last_press: 0.0},
-            right : PlayerKeyControl{key: hashmap.remove("right").unwrap(), last_press: 0.0},
-            attack: PlayerKeyControl{key: hashmap.remove("attack").unwrap(), last_press: 0.0},
-            defend: PlayerKeyControl{key: hashmap.remove("defend").unwrap(), last_press: 0.0},
-        }
-    }
 }
 
 impl Default for PlayerControls {
@@ -313,28 +301,30 @@ fn setup_game(
                                         player : player,
                                         fighter : fighter,
                                         position : Position{x : LEFT_WALL_X + 200.0, y :0.0},
+                                        velocity : Velocity{x : 0.0, y :-200.0},
                                         ..default()});
 
     //player2
-    let player = Player::Player2;
-    let fighter = Fighter::HAMAS;
-    let player2_controls = PlayerControls::from(HashMap::from([
-                                                            ("up", KeyCode::Up),
-                                                            ("down", KeyCode::Down),
-                                                            ("left", KeyCode::Left),
-                                                            ("right", KeyCode::Right),
-                                                            ("attack", KeyCode::ShiftRight),
-                                                            ("defend", KeyCode::Return)]));
-    let sprite_sheet_bundle = SpriteSheetBundle {
-        texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
-        sprite: TextureAtlasSprite{flip_x : true, ..default()},
-        ..default()};
-    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
-                                        player : player,
-                                        fighter : fighter,
-                                        position : Position{x : RIGHT_WALL_X - 200.0, y :0.0},
-                                        controls: player2_controls,
-                                        ..default()});
+    // let player = Player::Player2;
+    // let fighter = Fighter::HAMAS;
+    // let player2_controls = PlayerControls{up : PlayerKeyControl{key: KeyCode::Up, last_press: 0.0},
+    //                                                         down : PlayerKeyControl{key: KeyCode::Down, last_press: 0.0},
+    //                                                         left : PlayerKeyControl{key: KeyCode::Left, last_press: 0.0},
+    //                                                         right : PlayerKeyControl{key: KeyCode::Right, last_press: 0.0},
+    //                                                         attack: PlayerKeyControl{key: KeyCode::ShiftRight, last_press: 0.0},
+    //                                                         defend: PlayerKeyControl{key: KeyCode::Return, last_press: 0.0}
+    //                                                      };
+    // let sprite_sheet_bundle = SpriteSheetBundle {
+    //     texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
+    //     sprite: TextureAtlasSprite{flip_x : true, ..default()},
+    //     ..default()};
+    // commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
+    //                                     player : player,
+    //                                     fighter : fighter,
+    //                                     position : Position{x : RIGHT_WALL_X - 200.0, y :0.0},
+    //                                     velocity : Velocity{x : 0.0, y :-200.0},
+    //                                     controls: player2_controls,
+    //                                     ..default()});
     
     //insert resources
     commands.insert_resource(AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating)));
@@ -347,7 +337,7 @@ fn player_control(mut query: Query<(&mut PlayerControls,
                             keyboard_input: Res<Input<KeyCode>>,
                             time : Res<Time>) {
     
-    let double_tap_duration = Duration::from_millis(500).as_secs_f64();
+    let double_tap_duration = Duration::from_millis(200).as_secs_f64();
     let time_elapsed = time.elapsed_seconds_f64();
     for (mut player_controls,
         mut movement,
@@ -359,16 +349,16 @@ fn player_control(mut query: Query<(&mut PlayerControls,
             } else if keyboard_input.pressed(player_controls.down.key) {
                 movement.change_to(FighterMovement::Docking);
                 velocity.x = 0.0;
-            } else if keyboard_input.pressed(player_controls.right.key) {
-                if keyboard_input.just_pressed(player_controls.right.key) && 
-                        (time_elapsed - player_controls.right.last_press) < double_tap_duration {
+            } else if keyboard_input.just_pressed(player_controls.right.key) {
+                if *movement == FighterMovement::Running {continue;
+                
+                } else if (time_elapsed - player_controls.right.last_press) < double_tap_duration {
                     movement.change_to(FighterMovement::Running);
                     velocity.x = RUNNING_SPEED;
-                } else if *movement != FighterMovement::Running{
+                } else {
                     movement.change_to(FighterMovement::Walking);
                     velocity.x = WALKING_SPEED;
                 }
-                player_controls.right.last_press = time_elapsed;
             } else if keyboard_input.pressed(player_controls.left.key) {
                 if time_elapsed - player_controls.left.last_press < double_tap_duration {
                     movement.change_to(FighterMovement::Running);
@@ -378,10 +368,13 @@ fn player_control(mut query: Query<(&mut PlayerControls,
                     velocity.x = -WALKING_SPEED;
                 }
                 player_controls.left.last_press = time_elapsed;
-            } else {
+            } else if keyboard_input.just_released(player_controls.right.key) {
                 movement.change_to(FighterMovement::Idle);
                 velocity.x = 0.0;
             }
+        }
+        if keyboard_input.just_released(player_controls.right.key) {
+            player_controls.right.last_press = time_elapsed;
         }
     }
 }
@@ -398,12 +391,11 @@ fn update_state(mut query: Query<(&mut Position,
         position.x = (position.x + dt*velocity.x).clamp(LEFT_WALL_X,RIGHT_WALL_X);
         position.y = (position.y + dt*velocity.y).clamp(FLOOR_Y, CEILING_Y);
 
-        if position.y <= FLOOR_Y {
+        if *movement == FighterMovement::JumpLoop && position.y <= FLOOR_Y {
             movement.change_to(FighterMovement::Idle);
             velocity.y = 0.0;
             position.y = FLOOR_Y;
         } else {
-            assert!(*movement == FighterMovement::JumpLoop);
             velocity.y = velocity.y + GRAVITY * dt;
         }
     }
