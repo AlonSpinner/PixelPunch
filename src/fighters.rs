@@ -44,17 +44,49 @@ impl FighterMovement {
     }
 }
 
-struct FighterMovementGraph {
-    idle : FighterMovementNode,
-    jump_loop : FighterMovementNode,
-    docking : FighterMovementNode,
-    running : FighterMovementNode,
-    walking : FighterMovementNode,
+struct FighterMovementEdge {
+    to : FighterMovementNode,
+    controls : PlayerControls,
+    condition : fn() -> bool,
 }
 
 struct FighterMovementNode {
     movement : FighterMovement,
-    //each player controls allows for a transition to another movement
-    
-    
+    edges : Vec<FighterMovementEdge>,
 }
+
+struct FighterMovementGraph {
+    nodes : Vec<FighterMovementNode>,
+    current_node : FighterMovementNode,
+}
+
+impl FighterMovementGraph {
+    fn default() -> Self {
+        let mut nodes = Vec::new();
+        nodes.push(FighterMovementNode{
+            movement : FighterMovement::Idle,
+            edges : 
+        });
+        nodes.push(FighterMovementNode{
+            movement : FighterMovement::JumpLoop,
+            edges : Vec::new(),
+        });
+        nodes.push(FighterMovementNode{
+            movement : FighterMovement::Docking,
+            edges : Vec::new(),
+        });
+        nodes.push(FighterMovementNode{
+            movement : FighterMovement::Running,
+            edges : Vec::new(),
+        });
+        nodes.push(FighterMovementNode{
+            movement : FighterMovement::Walking,
+            edges : Vec::new(),
+        });
+        Self{
+            nodes,
+            current_node : nodes[0],
+        }
+    }
+}
+
