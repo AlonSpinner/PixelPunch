@@ -39,10 +39,16 @@ pub struct FighterVelocity {
 pub enum FighterMovement {
     Idle,
     JumpLoop,
-    #[strum(serialize = "Sliding")]
+    #[strum(to_string = "Sliding")]
     Docking,
-    Running,
-    Walking,
+    #[strum(to_string = "Running")]
+    RunningRight,
+    #[strum(to_string = "Running")]
+    RunningLeft,
+    #[strum(to_string = "Walking")]
+    WalkingRight,
+    #[strum(to_string = "Walking")]
+    WalkingLeft,
 }
 impl FighterMovement {
     //only change if new movement is different to allow Bevy's change detection to work
@@ -94,13 +100,17 @@ impl FighterMovementGraph {
         nodes.insert(FighterMovement::Docking, FighterMovementNodeTransition{
             enter_controls : HashSet::from([KeyControl{keytarget: KeyTarget::Down, tapped_amount: 1}]),
             ..default()});
-        nodes.insert(FighterMovement::Walking, FighterMovementNodeTransition{
-            enter_controls : HashSet::from([KeyControl{keytarget: KeyTarget::Left, tapped_amount: 1},
-                                            KeyControl{keytarget: KeyTarget::Right, tapped_amount: 1}]),
+        nodes.insert(FighterMovement::WalkingRight, FighterMovementNodeTransition{
+            enter_controls : HashSet::from([KeyControl{keytarget: KeyTarget::Left, tapped_amount: 1}]),
             ..default()});
-        nodes.insert(FighterMovement::Running, FighterMovementNodeTransition{
-            enter_controls : HashSet::from([KeyControl{keytarget: KeyTarget::Left, tapped_amount: 2},
-                                            KeyControl{keytarget: KeyTarget::Right, tapped_amount: 2}]),
+        nodes.insert(FighterMovement::WalkingLeft, FighterMovementNodeTransition{
+            enter_controls : HashSet::from([KeyControl{keytarget: KeyTarget::Left, tapped_amount: 1}]),
+            ..default()});
+        nodes.insert(FighterMovement::RunningRight, FighterMovementNodeTransition{
+            enter_controls : HashSet::from([KeyControl{keytarget: KeyTarget::Left, tapped_amount: 2}]),
+            ..default()});
+        nodes.insert(FighterMovement::RunningLeft, FighterMovementNodeTransition{
+            enter_controls : HashSet::from([KeyControl{keytarget: KeyTarget::Left, tapped_amount: 2}]),
             ..default()});
         Self{
             nodes,
