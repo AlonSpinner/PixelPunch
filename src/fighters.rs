@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use strum_macros::{EnumString, Display};
 use super::controls::{KeyControl,KeyTarget};
 use std::collections::{HashMap,HashSet};
+use std::hash::Hash;
 use std::ops::Add;
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
@@ -12,18 +13,23 @@ pub enum Fighter{
 
 pub const IDF_MOVEMENT_GRAPH : FighterMovementGraph = FighterMovementGraph::default();
 pub const HAMAS_MOVEMENT_GRAPH : FighterMovementGraph = FighterMovementGraph::default();
+pub const FIGHTERS_MOVEMENT_GRAPH : HashMap<Fighter, FighterMovementGraph> = 
+                                                HashMap::from([
+                                                    (Fighter::IDF, IDF_MOVEMENT_GRAPH),
+                                                    (Fighter::HAMAS, HAMAS_MOVEMENT_GRAPH)
+                                                    ]);
 
 #[derive(Component)]
-pub struct FighterHealth(f32);
+pub struct FighterHealth(pub f32);
 #[derive(Component)]
 pub struct FighterPosition {
-    x : f32,
-    y : f32,
+    pub x : f32,
+    pub y : f32,
 }
 #[derive(Component)]
 pub struct FighterVelocity {
-    x : f32,
-    y : f32,
+    pub x : f32,
+    pub y : f32,
 }
 
 //All possible movements for a fighter
@@ -46,34 +52,35 @@ impl FighterMovement {
     }
 }
 
+#[derive(Component)]
+pub struct FighterMovementDuration(pub f32);
+
 #[derive(Clone)]
-struct FighterMovementNodeTransition {
+pub struct FighterMovementNodeTransition {
     enter_controls : HashSet<KeyControl>, //combination of controls pressed to enter this node
-    enter_condition : fn(position : FighterPosition) -> bool,
+    enter_condition : fn(position_y : f32) -> bool,
     leave_condition : fn(movement_duration : f32) -> bool,
 }
 impl Default for FighterMovementNodeTransition {
     fn default() -> Self {
         Self{
             enter_controls: HashSet::new(),
-            enter_condition: |position| position.y == 0.0,
+            enter_condition: |position_y| position_y == 0.0,
             leave_condition: |movement_duration| true,
         }
     }
 }
 impl FighterMovementNodeTransition {
-    fn can_enter(&self, controls : &HashSet<KeyControl>) -> bool {
+    pub fn can_enter(&self, controls : &HashSet<KeyControl>) -> bool {
         self.enter_controls.is_subset(controls)
     }
-    fn can_leave(&self, movement_duration : f32) -> bool {
+    pub fn can_leave(&self, movement_duration : f32) -> bool {
         (self.leave_condition)(movement_duration)
     }
 }
 
-#[derive(Clone)]
 struct FighterMovementGraph {
-    nodes : HashMap<FighterMovement,FighterMovementNodeTransition>,
-    current_node : FighterMovement,
+    pub nodes : HashMap<FighterMovement,FighterMovementNodeTransition>,
 }
 
 impl FighterMovementGraph {
@@ -96,10 +103,9 @@ impl FighterMovementGraph {
             ..default()});
         Self{
             nodes,
-            current_node : FighterMovement::Idle,
         }
     }
-    fn movements(&self) -> Vec<FighterMovement> {
+    pub fn movements(&self) -> Vec<FighterMovement> {
         self.nodes.keys().map(|k| *k).collect()
     }
 }
@@ -111,7 +117,6 @@ impl Add for FighterMovementGraph {
         nodes.extend(other.nodes);
         Self{
             nodes,
-            current_node : self.current_node,
         }
     }
 }

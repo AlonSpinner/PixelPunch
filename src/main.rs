@@ -1,24 +1,32 @@
 use bevy::{prelude::*, asset::LoadState};
 use bevy_tile_atlas::TileAtlasBuilder;
-use std::collections::HashMap;
+use std::collections::{HashMap,HashSet};
 use std::hash::Hash;
 use std::time::Duration;
 use std::path::PathBuf;
 
 pub mod fighters;
-use fighters::{Fighter, FighterMovement};
+use fighters::*;
 pub mod controls;
-use controls::{PlayerControls, PlayerKeyControl};
+use controls::*;
 
+//movement
 const WALKING_SPEED : f32 = 100.0;
 const RUNNING_SPEED : f32 = 200.0;
-const GRAVITY : f32 = -100.0;
 const JUMPING_SPEED : f32 = 100.0;
+
+//scene
+const GRAVITY : f32 = -100.0;
 const CEILING_Y : f32 = 300.0;
 const FLOOR_Y : f32 = -300.0;
 const LEFT_WALL_X : f32 = -450.0;
 const RIGHT_WALL_X : f32 = 450.0;
+
+//controls and visuals
 const ANIMATION_TIME : f32 = 0.1;
+const DOUBLE_TAP_DURATION : f32 = 0.2; //seconds
+
+const FIGHTERS : [Fighter;2]= [Fighter::IDF, Fighter::HAMAS];
 
 fn main() {
     App::new()
@@ -49,19 +57,6 @@ pub enum AppState {
 }
 
 #[derive(Component)]
-struct Health(f32);
-#[derive(Component, Debug)]
-struct Position {
-    x : f32,
-    y : f32,
-}
-#[derive(Component)]
-struct Velocity {
-    x : f32,
-    y : f32,
-}
-
-#[derive(Component)]
 enum Player{
     Player1,
     Player2,
@@ -71,10 +66,11 @@ enum Player{
 struct PlayerBundle{
     player: Player,
     fighter: Fighter,
-    health: Health,
-    position: Position,
-    velocity: Velocity,
+    health: FighterHealth,
+    position: FighterPosition,
+    velocity: FighterVelocity,
     movement: FighterMovement,
+    movement_duration: FighterMovementDuration,
     sprite: SpriteSheetBundle,
     controls: PlayerControls,
 }
@@ -84,10 +80,11 @@ impl Default for PlayerBundle {
         Self{
             player: Player::Player1,
             fighter: Fighter::IDF,
-            health : Health(100.0),
-            position : Position{x : 0.0, y :0.0},
-            velocity : Velocity{x : 0.0, y :0.0},
+            health : FighterHealth(100.0),
+            position : FighterPosition{x : 0.0, y :0.0},
+            velocity : FighterVelocity{x : 0.0, y :0.0},
             movement : FighterMovement::JumpLoop,
+            movement_duration : FighterMovementDuration(0.0),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
         }
@@ -113,6 +110,7 @@ struct FightersMovementAnimationIndicies(HashMap<Fighter,FighterAnimationHash>);
 fn load_assets(mut commands: Commands,
                  asset_server: Res<AssetServer>) {
 
+
     let mut assets = AssetLoading {
         fighters_movement_sprites: HashMap::new(),
         background_sprites: Vec::new(),
@@ -121,11 +119,13 @@ fn load_assets(mut commands: Commands,
     //load background sprites
     assets.background_sprites.push(asset_server.load("background.png"));
 
+    
+    let fighters_graph = FIGHTERS_MOVEMENT_GRAPH;
     //load fighter sprites
-    let fighters = vec!(Fighter::IDF, Fighter::HAMAS);
-    for fighter in fighters {
+    for fighter in FIGHTERS {
+        let fighter_movement_graph = fighters_graph.get(&fighter).unwrap();
         let mut fighter_movement_sprites: HashMap<FighterMovement,Vec<Handle<Image>>> = HashMap::new();
-        for movement in fighter.movements() {
+        for movement in fighter_movement_graph.movements() {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
             let path = PathBuf::from("textures").join(fighter.to_string()).join(movement.to_string());
             let untyped_handles = asset_server.load_folder(path).unwrap();
@@ -222,7 +222,7 @@ fn setup_game(
 
     //player1
     let player = Player::Player1;
-    let fighter = Fighter::IDF;
+    let fighter = FIGHTERS[0];
     let sprite_sheet_bundle = SpriteSheetBundle {
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
         sprite: TextureAtlasSprite::default(),
@@ -230,8 +230,8 @@ fn setup_game(
     commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
                                         player : player,
                                         fighter : fighter,
-                                        position : Position{x : LEFT_WALL_X + 200.0, y :0.0},
-                                        velocity : Velocity{x : 0.0, y :-200.0},
+                                        position : FighterPosition{x : LEFT_WALL_X + 200.0, y :0.0},
+                                        velocity : FighterVelocity{x : 0.0, y :-200.0},
                                         ..default()});
 
     //player2
@@ -261,55 +261,43 @@ fn setup_game(
     commands.insert_resource(fighters_movement_animation_indicies);
 }
 
-fn player_control(mut query: Query<(&mut PlayerControls,
+fn player_control(mut query: Query<(&Fighter,
+                                    &mut PlayerControls,
                                     &mut FighterMovement,
-                                    &mut Velocity)>,
-                            keyboard_input: Res<Input<KeyCode>>,
-                            time : Res<Time>) {
+                                    &mut FighterMovementDuration,
+                                    &mut FighterVelocity)>,
+                                    keyboard_input: Res<Input<KeyCode>>,
+                                    time : Res<Time>) {
     
-    let double_tap_duration = Duration::from_millis(200).as_secs_f64();
-    let time_elapsed = time.elapsed_seconds_f64();
-    for (mut player_controls,
+    
+    let time_elapsed = time.elapsed_seconds();
+    let time_delta = time.delta_seconds();
+    let fighters_graph = FIGHTERS_MOVEMENT_GRAPH;
+
+    for (fighter,
+        mut player_controls,
         mut movement,
+        mut movement_duration,
         mut velocity) in query.iter_mut() {
-        if *movement != FighterMovement::JumpLoop {
-            if keyboard_input.just_pressed(player_controls.up.key) {
-                movement.change_to(FighterMovement::JumpLoop);
-                velocity.y = JUMPING_SPEED;
-            } else if keyboard_input.pressed(player_controls.down.key) {
-                movement.change_to(FighterMovement::Docking);
-                velocity.x = 0.0;
-            } else if keyboard_input.just_pressed(player_controls.right.key) {
-                if *movement == FighterMovement::Running {continue;
-                
-                } else if (time_elapsed - player_controls.right.last_press) < double_tap_duration {
-                    movement.change_to(FighterMovement::Running);
-                    velocity.x = RUNNING_SPEED;
-                } else {
-                    movement.change_to(FighterMovement::Walking);
-                    velocity.x = WALKING_SPEED;
+
+        movement_duration.0 += time_delta;
+        //create hashset of keycontrols
+        let mut controls: std::collections::HashSet<KeyControl> = HashSet::new();
+
+        let fighter_graph = fighters_graph.get(&fighter).unwrap();
+        let movement_node_transition = fighter_graph.nodes.get(&movement).unwrap();
+        if movement_node_transition.can_leave(movement_duration.0) {
+            for (new_movement, new_node ) in fighter_graph.nodes.iter() {
+                if new_node.can_enter(&controls) {
+                    movement.change_to(new_movement.clone());
+                    break;
                 }
-            } else if keyboard_input.pressed(player_controls.left.key) {
-                if time_elapsed - player_controls.left.last_press < double_tap_duration {
-                    movement.change_to(FighterMovement::Running);
-                    velocity.x = -RUNNING_SPEED;
-                } else {
-                    movement.change_to(FighterMovement::Walking);
-                    velocity.x = -WALKING_SPEED;
-                }
-                player_controls.left.last_press = time_elapsed;
-            } else if keyboard_input.just_released(player_controls.right.key) {
-                movement.change_to(FighterMovement::Idle);
-                velocity.x = 0.0;
             }
-        }
-        if keyboard_input.just_released(player_controls.right.key) {
-            player_controls.right.last_press = time_elapsed;
         }
     }
 }
-fn update_state(mut query: Query<(&mut Position,
-                                      &mut Velocity,
+fn update_state(mut query: Query<(&mut FighterPosition,
+                                      &mut FighterVelocity,
                                       &mut FighterMovement)>,
                                       time: Res<Time>,) {
     let dt = time.delta_seconds();
@@ -335,8 +323,8 @@ fn draw_fighters(time: Res<Time>,
                 fighters_movement_animation_indicies: Res<FightersMovementAnimationIndicies>,
                 mut animation_timer: ResMut<AnimationTimer>,
                 mut query: Query<(&Fighter,
-                               &Position,
-                               &Velocity,
+                               &FighterPosition,
+                               &FighterVelocity,
                                Ref<FighterMovement>,
                                &mut TextureAtlasSprite,
                                &mut Transform,)>) {
