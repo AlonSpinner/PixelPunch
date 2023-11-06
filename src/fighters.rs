@@ -4,6 +4,7 @@ use super::controls::{KeyControl,KeyTarget};
 use std::collections::{HashMap,HashSet};
 use std::hash::Hash;
 use std::ops::Add;
+use lazy_static::lazy_static;
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
 pub enum Fighter{
@@ -11,13 +12,14 @@ pub enum Fighter{
     HAMAS,
 }
 
-pub const IDF_MOVEMENT_GRAPH : FighterMovementGraph = FighterMovementGraph::default();
-pub const HAMAS_MOVEMENT_GRAPH : FighterMovementGraph = FighterMovementGraph::default();
-pub const FIGHTERS_MOVEMENT_GRAPH : HashMap<Fighter, FighterMovementGraph> = 
-                                                HashMap::from([
-                                                    (Fighter::IDF, IDF_MOVEMENT_GRAPH),
-                                                    (Fighter::HAMAS, HAMAS_MOVEMENT_GRAPH)
-                                                    ]);
+lazy_static! {
+pub static ref FIGHTERS_MOVEMENT_GRAPH : HashMap<Fighter, FighterMovementGraph> = {
+    let mut hashmap = HashMap::new();
+    hashmap.insert(Fighter::IDF, FighterMovementGraph::default());
+    hashmap.insert(Fighter::HAMAS, FighterMovementGraph::default());
+    hashmap
+    };
+}
 
 #[derive(Component)]
 pub struct FighterHealth(pub f32);
@@ -55,7 +57,6 @@ impl FighterMovement {
 #[derive(Component)]
 pub struct FighterMovementDuration(pub f32);
 
-#[derive(Clone)]
 pub struct FighterMovementNodeTransition {
     enter_controls : HashSet<KeyControl>, //combination of controls pressed to enter this node
     enter_condition : fn(position_y : f32) -> bool,
@@ -79,7 +80,7 @@ impl FighterMovementNodeTransition {
     }
 }
 
-struct FighterMovementGraph {
+pub struct FighterMovementGraph {
     pub nodes : HashMap<FighterMovement,FighterMovementNodeTransition>,
 }
 

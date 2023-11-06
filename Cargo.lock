@@ -2568,6 +2568,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_tile_atlas",
+ "lazy_static",
  "strum",
  "strum_macros",
 ]

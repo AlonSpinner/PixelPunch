@@ -120,10 +120,9 @@ fn load_assets(mut commands: Commands,
     assets.background_sprites.push(asset_server.load("background.png"));
 
     
-    let fighters_graph = FIGHTERS_MOVEMENT_GRAPH;
     //load fighter sprites
     for fighter in FIGHTERS {
-        let fighter_movement_graph = fighters_graph.get(&fighter).unwrap();
+        let fighter_movement_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         let mut fighter_movement_sprites: HashMap<FighterMovement,Vec<Handle<Image>>> = HashMap::new();
         for movement in fighter_movement_graph.movements() {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
@@ -272,7 +271,6 @@ fn player_control(mut query: Query<(&Fighter,
     
     let time_elapsed = time.elapsed_seconds();
     let time_delta = time.delta_seconds();
-    let fighters_graph = FIGHTERS_MOVEMENT_GRAPH;
 
     for (fighter,
         mut player_controls,
@@ -284,7 +282,7 @@ fn player_control(mut query: Query<(&Fighter,
         //create hashset of keycontrols
         let mut controls: std::collections::HashSet<KeyControl> = HashSet::new();
 
-        let fighter_graph = fighters_graph.get(&fighter).unwrap();
+        let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         let movement_node_transition = fighter_graph.nodes.get(&movement).unwrap();
         if movement_node_transition.can_leave(movement_duration.0) {
             for (new_movement, new_node ) in fighter_graph.nodes.iter() {
