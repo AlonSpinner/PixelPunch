@@ -63,19 +63,38 @@ impl FighterMovement {
         }
     }
 
-    pub fn update_position_velocity(&self, position : &mut FighterPosition, velocity : &mut FighterVelocity, delta_time : f32) {
+    pub fn enter_position_velocity(&self, _fighter_position : &mut FighterPosition,
+                                          fighter_velocity : &mut FighterVelocity) {
         match self {
             FighterMovement::Idle => {},
-            FighterMovement::Jumping{inital_velocity, gravity} => {
-                velocity.y = *inital_velocity + *gravity * delta_time;
-                position.y += velocity.y * delta_time;
+            FighterMovement::Jumping{inital_velocity, gravity: _} => {
+                fighter_velocity.y = *inital_velocity;
             },
             FighterMovement::Docking => {},
             FighterMovement::Running{velocity} => {
-                position.x += velocity * delta_time;
+                fighter_velocity.x = *velocity;
             },
             FighterMovement::Walking{velocity} => {
-                position.x += velocity * delta_time;
+                fighter_velocity.x = *velocity;
+            },
+        }
+    }
+
+    pub fn update_position_velocity(&self, figther_position : &mut FighterPosition,
+                                           fighter_velocity : &mut FighterVelocity,
+                                           delta_time : f32) {
+        match self {
+            FighterMovement::Idle => {},
+            FighterMovement::Jumping{inital_velocity: _, gravity} => {
+                figther_position.y += fighter_velocity.y * delta_time;
+                fighter_velocity.y += (*gravity) * delta_time;
+            },
+            FighterMovement::Docking => {},
+            FighterMovement::Running{velocity: _} => {
+                figther_position.x += fighter_velocity.x * delta_time;
+            },
+            FighterMovement::Walking{velocity: _} => {
+                figther_position.x += fighter_velocity.x * delta_time;
             },
         }
     }
@@ -83,20 +102,38 @@ impl FighterMovement {
 
 pub struct HitBox;
 
+#[allow(dead_code)]
 pub struct FighterMovementNode {
-    movement: FighterMovement,
-    player_enter_condition : fn(position_y : f32, previous_movement : FighterMovement) -> bool,
-    player_leave_condition : fn(position_y : f32, movement_duration : usize) -> bool,
-    enemy_enter_condition : fn() -> bool,
-    enemy_leave_condition : fn() -> bool,
-    hit_boxes : Vec<HitBox>,
-    hurt_boxes : Vec<HitBox>,
+    pub movement: FighterMovement,
+    pub player_enter_condition : fn(position_y : f32, previous_movement : &FighterMovement) -> bool,
+    pub player_leave_condition : fn(position_y : f32, movement_duration : usize) -> bool,
+    pub enemy_enter_condition : fn() -> bool,
+    pub enemy_leave_condition : fn() -> bool,
+    pub hit_boxes : Vec<HitBox>,
+    pub hurt_boxes : Vec<HitBox>,
 }
+
+impl FighterMovementNode {
+    pub fn player_enter_condition(&self, position_y : f32, previous_movement : &FighterMovement) -> bool {
+        (self.player_enter_condition)(position_y, previous_movement)
+    }
+    pub fn player_leave_condition(&self, position_y : f32, movement_duration : usize) -> bool {
+        (self.player_leave_condition)(position_y, movement_duration)
+    }
+    pub fn enemy_enter_condition(&self) -> bool {
+        (self.enemy_enter_condition)()
+    }
+    pub fn enemy_leave_condition(&self) -> bool {
+        (self.enemy_leave_condition)()
+    }
+}
+
+#[allow(unused_variables)]
 impl Default for FighterMovementNode {
     fn default() -> Self {
         Self{
             movement: FighterMovement::Idle,
-            player_enter_condition: |position_y, previous_movement| position_y == 0.0,
+            player_enter_condition: |position_y, previous_movement| (position_y).abs()<1e-10,
             player_leave_condition: |position_y, movement_duration| position_y == 0.0,
             enemy_enter_condition: || false,
             enemy_leave_condition: || false,
@@ -108,7 +145,7 @@ impl Default for FighterMovementNode {
 
 //A static graph of all possible movements for a fighter. NO DYNAMIC DATA.
 pub struct FighterMovementMap{
-    nodes : HashMap<KeyTargetSet,FighterMovementNode>
+    pub nodes : HashMap<KeyTargetSet,FighterMovementNode>
 }
 
 impl FighterMovementMap {

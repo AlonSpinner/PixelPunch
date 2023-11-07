@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use std::collections::BTreeSet;
 use std::ops::Add;
 
-#[derive(Eq, Hash, PartialEq, Clone, Copy, Ord, PartialOrd)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Ord, PartialOrd, Debug)]
 pub enum KeyTarget{
     Up,
     Down,
@@ -11,7 +11,7 @@ pub enum KeyTarget{
     Attack,
     Defend,
 }
-#[derive(Hash, Eq, PartialEq, Clone)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct KeyTargetSet(BTreeSet<KeyTarget>);
 
 impl KeyTargetSet {
@@ -47,13 +47,13 @@ impl Add <KeyTarget> for KeyTargetSet {
     }
 }
 
-
 pub struct PlayerKeyControl{
     pub keycode : KeyCode,
     pub keytarget : KeyTarget, 
     pub last_released : f32
 }
 
+#[allow(dead_code)]
 #[derive(Component)]
 pub struct PlayerControls{
     up : PlayerKeyControl,
@@ -74,5 +74,30 @@ impl Default for PlayerControls {
             attack: PlayerKeyControl{keycode: KeyCode::F, keytarget: KeyTarget::Attack, last_released: 0.0},
             defend: PlayerKeyControl{keycode: KeyCode::G, keytarget: KeyTarget::Defend, last_released: 0.0},
         }
+    }
+}
+
+impl PlayerControls {
+    pub fn into_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
+        let mut keytargetset = KeyTargetSet::empty();
+        if keyboard_input.pressed(self.up.keycode) {
+            keytargetset = keytargetset + self.up.keytarget;
+        }
+        if keyboard_input.pressed(self.down.keycode) {
+            keytargetset = keytargetset + self.down.keytarget;
+        }
+        if keyboard_input.pressed(self.left.keycode) {
+            keytargetset = keytargetset + self.left.keytarget;
+        }
+        if keyboard_input.pressed(self.right.keycode) {
+            keytargetset = keytargetset + self.right.keytarget;
+        }
+        if keyboard_input.pressed(self.attack.keycode) {
+            keytargetset = keytargetset + self.attack.keytarget;
+        }
+        if keyboard_input.pressed(self.defend.keycode) {
+            keytargetset = keytargetset + self.defend.keytarget;
+        }
+        keytargetset
     }
 }

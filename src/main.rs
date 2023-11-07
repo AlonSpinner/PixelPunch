@@ -225,7 +225,7 @@ fn setup_game(
                                         player : player,
                                         fighter : fighter,
                                         position : FighterPosition{x : LEFT_WALL_X + 200.0, y :0.0},
-                                        velocity : FighterVelocity{x : 0.0, y :-200.0},
+                                        velocity : FighterVelocity{x : 0.0, y :-JUMPING_SPEED},
                                         ..default()});
 
     //player2
@@ -259,26 +259,38 @@ fn player_control(mut query: Query<(&Fighter,
                                     &mut PlayerControls,
                                     &mut FighterMovement,
                                     &mut FighterMovementDuration,
+                                    &mut FighterPosition,
                                     &mut FighterVelocity)>,
-                                    keyboard_input: Res<Input<KeyCode>>,
+                                    keyboard_input_resource: Res<Input<KeyCode>>,
                                     time : Res<Time>) {
     
     
     let time_elapsed = time.elapsed_seconds();
     let time_delta = time.delta_seconds();
 
+    let keyboard_input = keyboard_input_resource.into_inner();
+
     for (fighter,
         mut player_controls,
         mut movement,
         mut movement_duration,
+        mut position,
         mut velocity) in query.iter_mut() {
 
-        movement_duration.0 += 1; //increment movement duration by 1 frame
-        
-        //create hashset of keycontrols
-        // let mut controls: std::collections::HashSet<KeyControl> = HashSet::new();
-
-        // let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+        let previous_movement = movement.clone();
+        // create hashset of keycontrols
+        let keyset = player_controls.into_keytargetset(keyboard_input);
+        let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+        if let Some(new_movement_node) = fighter_graph.nodes.get(&keyset) {
+            if new_movement_node.movement.to_string() != movement.to_string() &&
+            new_movement_node.player_enter_condition(position.y, &previous_movement) {
+                movement.change_to(new_movement_node.movement.clone());
+                movement.enter_position_velocity(&mut position, &mut velocity);
+                movement_duration.0 = 0;
+            }
+        } else {
+            movement_duration.0 += 1; //increment movement duration by 1 frame
+        }
         // let movement_node_transition = fighter_graph.nodes.get(&movement).unwrap();
         // if movement_node_transition.can_leave(movement_duration.0) {
         //     for (new_movement, new_node ) in fighter_graph.nodes.iter() {
@@ -298,7 +310,7 @@ fn update_state(mut query: Query<(&mut FighterPosition,
     
     for (mut position,
          mut velocity,
-         mut movement) in query.iter_mut() {
+        movement) in query.iter_mut() {
         
         movement.update_position_velocity(&mut position, &mut velocity, dt);
         position.x = position.x.clamp(LEFT_WALL_X,RIGHT_WALL_X);
