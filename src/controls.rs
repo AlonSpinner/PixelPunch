@@ -1,6 +1,8 @@
 use bevy::prelude::*;
+use std::collections::BTreeSet;
+use std::ops::Add;
 
-#[derive(Eq, Hash, PartialEq, Clone, Copy)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Ord, PartialOrd)]
 pub enum KeyTarget{
     Up,
     Down,
@@ -9,12 +11,42 @@ pub enum KeyTarget{
     Attack,
     Defend,
 }
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub struct KeyTargetSet(BTreeSet<KeyTarget>);
 
-#[derive(Eq, Hash, PartialEq, Clone, Copy)]
-pub struct KeyControl{
-    pub keytarget : KeyTarget,
-    pub tapped_amount : usize,
+impl KeyTargetSet {
+    pub fn empty() -> Self {
+        Self(BTreeSet::new())
+    }
 }
+
+impl<const N: usize> From<[KeyTarget; N]> for KeyTargetSet {
+    fn from(array: [KeyTarget; N]) -> Self {
+        Self(array.iter().cloned().collect())
+    }
+
+}
+
+impl Add for KeyTargetSet {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut new_set = self.0;
+        new_set.extend(rhs.0);
+        Self(new_set)
+    }
+}
+
+impl Add <KeyTarget> for KeyTargetSet {
+    type Output = Self;
+
+    fn add(self, rhs: KeyTarget) -> Self::Output {
+        let mut new_set = self.0;
+        new_set.insert(rhs);
+        Self(new_set)
+    }
+}
+
 
 pub struct PlayerKeyControl{
     pub keycode : KeyCode,

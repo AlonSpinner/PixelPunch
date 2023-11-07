@@ -10,13 +10,8 @@ use fighters::*;
 pub mod controls;
 use controls::*;
 
-//movement
-const WALKING_SPEED : f32 = 100.0;
-const RUNNING_SPEED : f32 = 200.0;
-const JUMPING_SPEED : f32 = 100.0;
-
 //scene
-const GRAVITY : f32 = -100.0;
+
 const CEILING_Y : f32 = 300.0;
 const FLOOR_Y : f32 = -300.0;
 const LEFT_WALL_X : f32 = -450.0;
@@ -83,8 +78,8 @@ impl Default for PlayerBundle {
             health : FighterHealth(100.0),
             position : FighterPosition{x : 0.0, y :0.0},
             velocity : FighterVelocity{x : 0.0, y :0.0},
-            movement : FighterMovement::JumpLoop,
-            movement_duration : FighterMovementDuration(0.0),
+            movement : FighterMovement::Jumping{inital_velocity : -JUMPING_SPEED, gravity : GRAVITY},
+            movement_duration : FighterMovementDuration(0),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
         }
@@ -96,12 +91,12 @@ struct AnimationTimer(Timer);
 
 #[derive(Resource)]
 struct AssetLoading {
-    fighters_movement_sprites: HashMap<Fighter, HashMap<FighterMovement, Vec<Handle<Image>>>>,
+    fighters_movement_sprites: HashMap<Fighter, HashMap<String, Vec<Handle<Image>>>>,
     background_sprites: Vec<Handle<Image>>,
 }
 
 struct FighterAnimationHash {
-    hashmap: HashMap<FighterMovement, [usize;2]>,
+    hashmap: HashMap<String, [usize;2]>,
     atlas_handle: Handle<TextureAtlas>,
 }
 #[derive(Resource)]
@@ -123,16 +118,16 @@ fn load_assets(mut commands: Commands,
     //load fighter sprites
     for fighter in FIGHTERS {
         let fighter_movement_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-        let mut fighter_movement_sprites: HashMap<FighterMovement,Vec<Handle<Image>>> = HashMap::new();
-        for movement in fighter_movement_graph.movements() {
+        let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
+        for movement_name in fighter_movement_graph.movements() {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
-            let path = PathBuf::from("textures").join(fighter.to_string()).join(movement.to_string());
+            let path = PathBuf::from("textures").join(fighter.to_string()).join(&movement_name);
             let untyped_handles = asset_server.load_folder(path).unwrap();
             for handle in untyped_handles.iter() {
                 let image_handle = handle.clone().typed();
                 sprites_vec.push(image_handle);
             }
-        fighter_movement_sprites.insert(movement, sprites_vec);
+        fighter_movement_sprites.insert(movement_name.clone(), sprites_vec);
         }
         assets.fighters_movement_sprites.insert(fighter, fighter_movement_sprites);
     }
@@ -205,13 +200,13 @@ fn setup_game(
     let mut fighters_movement_animation_indicies = FightersMovementAnimationIndicies(HashMap::new());
     for (fighter, movement_sprites_handles) in asset_loading.fighters_movement_sprites.iter() {
         let mut atlas_builder: TileAtlasBuilder = TileAtlasBuilder::default();
-        let mut movement_indicies: HashMap<FighterMovement, [usize;2]> = HashMap::new();
+        let mut movement_indicies: HashMap<String, [usize;2]> = HashMap::new();
         let mut index : usize = 0;
-        for (movement, sprites_handles) in movement_sprites_handles.iter() {
+        for (movement_name, sprites_handles) in movement_sprites_handles.iter() {
             for sprite_handle in sprites_handles.iter() {
                 atlas_builder.add_texture(sprite_handle.clone(), textures.get(&sprite_handle).unwrap()).unwrap();
             }
-            movement_indicies.insert(movement.clone(), [index, index + sprites_handles.len()-1]);
+            movement_indicies.insert(movement_name.clone(), [index, index + sprites_handles.len()-1]);
             index += sprites_handles.len();
         }
         let texture_atlas_handle = texture_atlases.add(atlas_builder.finish(&mut textures).unwrap());
@@ -278,20 +273,21 @@ fn player_control(mut query: Query<(&Fighter,
         mut movement_duration,
         mut velocity) in query.iter_mut() {
 
-        movement_duration.0 += time_delta;
+        movement_duration.0 += 1; //increment movement duration by 1 frame
+        
         //create hashset of keycontrols
-        let mut controls: std::collections::HashSet<KeyControl> = HashSet::new();
+        // let mut controls: std::collections::HashSet<KeyControl> = HashSet::new();
 
-        let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-        let movement_node_transition = fighter_graph.nodes.get(&movement).unwrap();
-        if movement_node_transition.can_leave(movement_duration.0) {
-            for (new_movement, new_node ) in fighter_graph.nodes.iter() {
-                if new_node.can_enter(&controls) {
-                    movement.change_to(new_movement.clone());
-                    break;
-                }
-            }
-        }
+        // let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+        // let movement_node_transition = fighter_graph.nodes.get(&movement).unwrap();
+        // if movement_node_transition.can_leave(movement_duration.0) {
+        //     for (new_movement, new_node ) in fighter_graph.nodes.iter() {
+        //         if new_node.can_enter(&controls) {
+        //             movement.change_to(new_movement.clone());
+        //             break;
+        //         }
+        //     }
+        // }
     }
 }
 fn update_state(mut query: Query<(&mut FighterPosition,
@@ -304,16 +300,9 @@ fn update_state(mut query: Query<(&mut FighterPosition,
          mut velocity,
          mut movement) in query.iter_mut() {
         
-        position.x = (position.x + dt*velocity.x).clamp(LEFT_WALL_X,RIGHT_WALL_X);
-        position.y = (position.y + dt*velocity.y).clamp(FLOOR_Y, CEILING_Y);
-
-        if *movement == FighterMovement::JumpLoop && position.y <= FLOOR_Y {
-            movement.change_to(FighterMovement::Idle);
-            velocity.y = 0.0;
-            position.y = FLOOR_Y;
-        } else {
-            velocity.y = velocity.y + GRAVITY * dt;
-        }
+        movement.update_position_velocity(&mut position, &mut velocity, dt);
+        position.x = position.x.clamp(LEFT_WALL_X,RIGHT_WALL_X);
+        position.y = position.y.clamp(FLOOR_Y, CEILING_Y);
     }
 }
 
@@ -337,7 +326,7 @@ fn draw_fighters(time: Res<Time>,
         
         if animation_timer.just_finished() {
             let movement_indicies = fighters_movement_animation_indicies.0.get(&fighter).unwrap()
-                                                                                .hashmap.get(&movement).unwrap();
+                                                                                .hashmap.get(&movement.to_string()).unwrap();
             if sprite.index < movement_indicies[0] || sprite.index > movement_indicies[1]-1 {
                 sprite.index = movement_indicies[0];
             } else {
@@ -352,7 +341,5 @@ fn draw_fighters(time: Res<Time>,
         } else if velocity.x < 0.0 {
             sprite.flip_x = true;
         }
-
-
     }
 }
