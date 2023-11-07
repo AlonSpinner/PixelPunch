@@ -105,8 +105,8 @@ pub struct HitBox;
 #[allow(dead_code)]
 pub struct FighterMovementNode {
     pub movement: FighterMovement,
-    pub player_enter_condition : fn(position_y : f32, previous_movement : &FighterMovement) -> bool,
-    pub player_leave_condition : fn(position_y : f32, movement_duration : usize) -> bool,
+    pub player_enter_condition : fn(floor_y : f32, position_y : f32, previous_movement : &FighterMovement) -> bool,
+    pub player_leave_condition : fn(floor_y : f32, position_y : f32, movement_duration : usize) -> bool,
     pub enemy_enter_condition : fn() -> bool,
     pub enemy_leave_condition : fn() -> bool,
     pub hit_boxes : Vec<HitBox>,
@@ -114,11 +114,11 @@ pub struct FighterMovementNode {
 }
 
 impl FighterMovementNode {
-    pub fn player_enter_condition(&self, position_y : f32, previous_movement : &FighterMovement) -> bool {
-        (self.player_enter_condition)(position_y, previous_movement)
+    pub fn player_enter_condition(&self, floor_y : f32,  position_y : f32, previous_movement : &FighterMovement) -> bool {
+        (self.player_enter_condition)(floor_y, position_y, previous_movement)
     }
-    pub fn player_leave_condition(&self, position_y : f32, movement_duration : usize) -> bool {
-        (self.player_leave_condition)(position_y, movement_duration)
+    pub fn player_leave_condition(&self, floor_y :f32,  position_y : f32, movement_duration : usize) -> bool {
+        (self.player_leave_condition)(floor_y, position_y, movement_duration)
     }
     pub fn enemy_enter_condition(&self) -> bool {
         (self.enemy_enter_condition)()
@@ -133,8 +133,8 @@ impl Default for FighterMovementNode {
     fn default() -> Self {
         Self{
             movement: FighterMovement::Idle,
-            player_enter_condition: |position_y, previous_movement| (position_y).abs()<1e-10,
-            player_leave_condition: |position_y, movement_duration| position_y == 0.0,
+            player_enter_condition: |floor_y, position_y, previous_movement| position_y == floor_y,
+            player_leave_condition: |floor_y, position_y, movement_duration| position_y == floor_y,
             enemy_enter_condition: || false,
             enemy_leave_condition: || false,
             hit_boxes: Vec::new(),

@@ -283,7 +283,7 @@ fn player_control(mut query: Query<(&Fighter,
         let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         if let Some(new_movement_node) = fighter_graph.nodes.get(&keyset) {
             if new_movement_node.movement.to_string() != movement.to_string() &&
-            new_movement_node.player_enter_condition(position.y, &previous_movement) {
+            new_movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
                 movement.change_to(new_movement_node.movement.clone());
                 movement.enter_position_velocity(&mut position, &mut velocity);
                 movement_duration.0 = 0;
