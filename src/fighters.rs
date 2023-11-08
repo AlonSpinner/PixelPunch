@@ -107,6 +107,7 @@ impl FighterMovement {
 
 pub struct HitBox;
 
+//static data accompanying a movement
 #[allow(dead_code)]
 pub struct FighterMovementNode {
     pub movement: FighterMovement,

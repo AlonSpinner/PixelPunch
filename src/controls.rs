@@ -53,30 +53,29 @@ impl Add <KeyTarget> for KeyTargetSet {
 
 pub struct PlayerKeyControl{
     pub keycode : KeyCode,
-    pub keytarget : KeyTarget, 
     pub last_released : f32
 }
 
 #[allow(dead_code)]
 #[derive(Component)]
 pub struct PlayerControls{
-    up : PlayerKeyControl,
-    down : PlayerKeyControl,
-    left : PlayerKeyControl,
-    right : PlayerKeyControl,
-    attack : PlayerKeyControl,
-    defend : PlayerKeyControl,
+    pub up : PlayerKeyControl,
+    pub down : PlayerKeyControl,
+    pub left : PlayerKeyControl,
+    pub right : PlayerKeyControl,
+    pub attack : PlayerKeyControl,
+    pub defend : PlayerKeyControl,
 }
 
 impl Default for PlayerControls {
     fn default() -> Self {
         Self{
-            up : PlayerKeyControl{keycode: KeyCode::W, keytarget: KeyTarget::Up, last_released: 0.0},
-            down : PlayerKeyControl{keycode: KeyCode::S, keytarget: KeyTarget::Down, last_released: 0.0},
-            left : PlayerKeyControl{keycode: KeyCode::A, keytarget: KeyTarget::Left, last_released: 0.0},
-            right : PlayerKeyControl{keycode: KeyCode::D, keytarget: KeyTarget::Right, last_released: 0.0},
-            attack: PlayerKeyControl{keycode: KeyCode::F, keytarget: KeyTarget::Attack, last_released: 0.0},
-            defend: PlayerKeyControl{keycode: KeyCode::G, keytarget: KeyTarget::Defend, last_released: 0.0},
+            up : PlayerKeyControl{keycode: KeyCode::W, last_released: 0.0},
+            down : PlayerKeyControl{keycode: KeyCode::S, last_released: 0.0},
+            left : PlayerKeyControl{keycode: KeyCode::A, last_released: 0.0},
+            right : PlayerKeyControl{keycode: KeyCode::D, last_released: 0.0},
+            attack: PlayerKeyControl{keycode: KeyCode::F, last_released: 0.0},
+            defend: PlayerKeyControl{keycode: KeyCode::G, last_released: 0.0},
         }
     }
 }
@@ -85,22 +84,22 @@ impl PlayerControls {
     pub fn into_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
         let mut keytargetset = KeyTargetSet::empty();
         if keyboard_input.pressed(self.up.keycode) {
-            keytargetset = keytargetset + self.up.keytarget;
+            keytargetset = keytargetset + KeyTarget::Up;
         }
         if keyboard_input.pressed(self.down.keycode) {
-            keytargetset = keytargetset + self.down.keytarget;
+            keytargetset = keytargetset + KeyTarget::Down;
         }
         if keyboard_input.pressed(self.left.keycode) {
-            keytargetset = keytargetset + self.left.keytarget;
+            keytargetset = keytargetset + KeyTarget::Left;
         }
         if keyboard_input.pressed(self.right.keycode) {
-            keytargetset = keytargetset + self.right.keytarget;
+            keytargetset = keytargetset + KeyTarget::Right;
         }
         if keyboard_input.pressed(self.attack.keycode) {
-            keytargetset = keytargetset + self.attack.keytarget;
+            keytargetset = keytargetset + KeyTarget::Attack;
         }
         if keyboard_input.pressed(self.defend.keycode) {
-            keytargetset = keytargetset + self.defend.keytarget;
+            keytargetset = keytargetset + KeyTarget::Defend;
         }
         keytargetset
     }

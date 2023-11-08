@@ -233,27 +233,28 @@ fn setup_game(
                                         velocity : FighterVelocity{x : 0.0, y :-JUMPING_SPEED},
                                         ..default()});
 
-    //player2
-    // let player = Player::Player2;
-    // let fighter = Fighter::HAMAS;
-    // let player2_controls = PlayerControls{up : PlayerKeyControl{key: KeyCode::Up, last_press: 0.0},
-    //                                                         down : PlayerKeyControl{key: KeyCode::Down, last_press: 0.0},
-    //                                                         left : PlayerKeyControl{key: KeyCode::Left, last_press: 0.0},
-    //                                                         right : PlayerKeyControl{key: KeyCode::Right, last_press: 0.0},
-    //                                                         attack: PlayerKeyControl{key: KeyCode::ShiftRight, last_press: 0.0},
-    //                                                         defend: PlayerKeyControl{key: KeyCode::Return, last_press: 0.0}
-    //                                                      };
-    // let sprite_sheet_bundle = SpriteSheetBundle {
-    //     texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
-    //     sprite: TextureAtlasSprite{flip_x : true, ..default()},
-    //     ..default()};
-    // commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
-    //                                     player : player,
-    //                                     fighter : fighter,
-    //                                     position : Position{x : RIGHT_WALL_X - 200.0, y :0.0},
-    //                                     velocity : Velocity{x : 0.0, y :-200.0},
-    //                                     controls: player2_controls,
-    //                                     ..default()});
+    // player2
+    let player = Player::Player2;
+    let fighter = Fighter::HAMAS;
+    let player2_controls = PlayerControls{
+        up: PlayerKeyControl{keycode: KeyCode::Up, last_released: 0.0},
+        down: PlayerKeyControl{keycode: KeyCode::Down, last_released: 0.0},
+        left: PlayerKeyControl{keycode: KeyCode::Left, last_released: 0.0},
+        right: PlayerKeyControl{keycode: KeyCode::Right, last_released: 0.0},
+        defend: PlayerKeyControl{keycode: KeyCode::ShiftRight, last_released: 0.0},
+        attack: PlayerKeyControl{keycode: KeyCode::Return, last_released: 0.0}};
+
+    let sprite_sheet_bundle = SpriteSheetBundle {
+        texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
+        sprite: TextureAtlasSprite{flip_x : true, ..default()},
+        ..default()};
+    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
+                                        player : player,
+                                        fighter : fighter,
+                                        position : FighterPosition{x : RIGHT_WALL_X - 200.0, y :0.0},
+                                        velocity : FighterVelocity{x : 0.0, y :-JUMPING_SPEED},
+                                        controls: player2_controls,
+                                        ..default()});
     
     //insert resources
     commands.insert_resource(AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating)));
