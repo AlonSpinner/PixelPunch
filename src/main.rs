@@ -237,12 +237,13 @@ fn setup_game(
     let player = Player::Player2;
     let fighter = Fighter::HAMAS;
     let player2_controls = PlayerControls{
-        up: PlayerKeyControl{keycode: KeyCode::Up, last_released: 0.0},
-        down: PlayerKeyControl{keycode: KeyCode::Down, last_released: 0.0},
-        left: PlayerKeyControl{keycode: KeyCode::Left, last_released: 0.0},
-        right: PlayerKeyControl{keycode: KeyCode::Right, last_released: 0.0},
-        defend: PlayerKeyControl{keycode: KeyCode::ShiftRight, last_released: 0.0},
-        attack: PlayerKeyControl{keycode: KeyCode::Return, last_released: 0.0}};
+        up: KeyCode::Up,
+        down: KeyCode::Down,
+        left: KeyCode::Left,
+        right: KeyCode::Right,
+        defend: KeyCode::ShiftRight,
+        attack: KeyCode::Return,
+    };
 
     let sprite_sheet_bundle = SpriteSheetBundle {
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
@@ -284,20 +285,34 @@ fn player_control(mut query: Query<(&Fighter,
         mut velocity) in query.iter_mut() {
 
         let previous_movement = movement.clone();
-        // create hashset of keycontrols
         let keyset = player_controls.into_keytargetset(keyboard_input);
         let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-        if let Some(new_movement_node) = fighter_graph.nodes.get(&keyset) {
-            if new_movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
+
+        if let Some(new_movement_node) = fighter_graph.nodes.get(&keyset) {    
+            //check if we are evolving movement
+            if new_movement_node.movement == previous_movement { 
+                if let Some(evovled_movment_node) = new_movement_node.evovled_node.as_ref() {
+                    if evovled_movment_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
+                        info!("evoled movement");
+                        movement.change_to(evovled_movment_node.movement.clone());
+                        movement.enter_position_velocity(&mut position, &mut velocity);
+                    }
+                }
+            //look for new movement
+            } else if new_movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
+                info!("found new movement from hash");
                 movement.change_to(new_movement_node.movement.clone());
                 movement.enter_position_velocity(&mut position, &mut velocity);
             }
+
+        //havent found movement in hashmap, maybe its in subset of keys
         } else {
             for (movement_key_set, new_movement_node) in fighter_graph.nodes.iter() {
                 if new_movement_node.movement == FighterMovement::Idle {continue;}
                 if movement_key_set.is_subset(&keyset) {
                     if new_movement_node.movement.to_string() != movement.to_string() &&
                     new_movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
+                        info!("found new movement from subset");
                         movement.change_to(new_movement_node.movement.clone());
                         movement.enter_position_velocity(&mut position, &mut velocity);
                         break;

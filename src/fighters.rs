@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::utils::petgraph::graphmap::Nodes;
 use strum_macros::{EnumString, Display};
 use super::controls::{KeyTargetSet,KeyTarget};
 use std::collections::HashMap;
@@ -117,6 +118,7 @@ pub struct FighterMovementNode {
     pub enemy_leave_condition : fn() -> bool,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
+    pub evovled_node: Option<Box<FighterMovementNode>>,
 }
 
 impl FighterMovementNode {
@@ -132,6 +134,13 @@ impl FighterMovementNode {
     pub fn enemy_leave_condition(&self) -> bool {
         (self.enemy_leave_condition)()
     }
+
+    fn recursive_find_movement_names(node: &FighterMovementNode, names: &mut Vec<String>) {
+        names.push(node.movement.to_string());
+        if let Some(ref evolved_node) = node.evovled_node {
+            FighterMovementNode::recursive_find_movement_names(evolved_node, names);
+        }
+    }
 }
 
 #[allow(unused_variables)]
@@ -145,6 +154,7 @@ impl Default for FighterMovementNode {
             enemy_leave_condition: || false,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
+            evovled_node: None,
         }
     }
 }
@@ -168,20 +178,29 @@ impl FighterMovementMap {
             ..default()});
         nodes.insert(KeyTargetSet::from([KeyTarget::Left]), FighterMovementNode{
             movement: FighterMovement::Walking{velocity: -WALKING_SPEED},
+            evovled_node: Some(Box::new(FighterMovementNode{
+                                movement: FighterMovement::Running{velocity: -RUNNING_SPEED},
+                                ..default()})),
+            player_enter_condition: |floor_y, position_y, previous_movement| 
+                                    position_y == floor_y && previous_movement != &FighterMovement::Running { velocity: -RUNNING_SPEED },
             ..default()});
         nodes.insert(KeyTargetSet::from([KeyTarget::Right]), FighterMovementNode{
             movement: FighterMovement::Walking{velocity: WALKING_SPEED},
+            evovled_node: Some(Box::new(FighterMovementNode{
+                                movement: FighterMovement::Running{velocity: RUNNING_SPEED},
+                                ..default()})),
+            player_enter_condition: |floor_y, position_y, previous_movement| 
+                position_y == floor_y && previous_movement != &FighterMovement::Running { velocity: RUNNING_SPEED },
             ..default()});
-        // nodes.insert(KeyTargetSet::from([KeyTarget::Left]), FighterMovementNode{
-        //     movement: FighterMovement::Running{velocity: -RUNNING_SPEED},
-        //     ..default()});
-        // nodes.insert(KeyTargetSet::from([KeyTarget::Right]), FighterMovementNode{
-        //     movement: FighterMovement::Running{velocity: RUNNING_SPEED},
-        //     ..default()});
         Self{ nodes :nodes}
     }
     pub fn movements(&self) -> Vec<String> {
-        self.nodes.values().map(|v| v.movement.to_string()).collect()
+        let mut names = Vec::new();
+        // Start the recursion for each top-level node
+        for node in self.nodes.values() {
+            FighterMovementNode::recursive_find_movement_names(node, &mut names);
+        }
+        names
     }
 }
 
