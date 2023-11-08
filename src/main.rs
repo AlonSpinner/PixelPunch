@@ -284,23 +284,24 @@ fn player_control(mut query: Query<(&Fighter,
         mut position,
         mut velocity) in query.iter_mut() {
 
-        let previous_movement = movement.clone();
+        // let previous_movement = movement.clone();
         let keyset = player_controls.into_keytargetset(keyboard_input);
         let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
 
-        if let Some(possible_new_movements) = fighter_graph.map.get(&keyset) {    
+        if let Some(possible_new_movements) = fighter_graph.keyset_map.get(&keyset) {    
             for movement_node in possible_new_movements {
-                if movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
+                if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement) {
                     movement.change_to(movement_node.movement.clone());
                     movement.enter_position_velocity(&mut position, &mut velocity);
                 }
             }
         //havent found movement in hashmap, maybe its in subset of keys
         } else {
-            for (movement_node_keyset, possible_new_movements) in fighter_graph.map.iter() {
+            for (movement_node_keyset, possible_new_movements) in fighter_graph.keyset_map.iter() {
                 if movement_node_keyset != &KeyTargetSet::empty() && movement_node_keyset.is_subset(&keyset) {
                     for new_movement_node in possible_new_movements {
-                        if new_movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
+                        if new_movement_node.movement.name() == movement.name() {continue;
+                        } else if new_movement_node.player_enter_condition(FLOOR_Y, position.y, &movement) {
                             info!("found new movement from subset");
                             movement.change_to(new_movement_node.movement.clone());
                             movement.enter_position_velocity(&mut position, &mut velocity);

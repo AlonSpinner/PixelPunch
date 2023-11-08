@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::Add;
 use lazy_static::lazy_static;
+use std::sync::Arc;
 
 //movement
 pub const WALKING_SPEED : f32 = 100.0;
@@ -157,43 +158,72 @@ impl Default for FighterMovementNode {
 }
 
 //A static graph of all possible movements for a fighter. NO DYNAMIC DATA.
-pub struct FighterMovementMap{
-    pub map : HashMap<KeyTargetSet,Vec<FighterMovementNode>>
+pub struct FighterMovementMap {
+    pub keyset_map : HashMap<KeyTargetSet,Vec<Arc<FighterMovementNode>>>,
+    pub index_map : HashMap<usize, Arc<FighterMovementNode>>,
 }
 
 impl FighterMovementMap {
-    fn default() -> Self {
-        let mut map = HashMap::new();
-        map.insert(KeyTargetSet::empty(), 
-        vec![FighterMovementNode{movement: FighterMovement::Idle,..default()}]);
-        map.insert(KeyTargetSet::from([KeyTarget::Up]), 
-        vec![FighterMovementNode{movement: FighterMovement::Jumping{inital_velocity: JUMPING_SPEED, gravity: GRAVITY},..default()}]);
-        map.insert(KeyTargetSet::from([KeyTarget::Down]), 
-        vec![FighterMovementNode{movement: FighterMovement::Docking,..default()}]);
-        map.insert(KeyTargetSet::from([KeyTarget::Left]), 
-        vec![FighterMovementNode{movement: FighterMovement::Walking{velocity: -WALKING_SPEED},..default()}]);
-        map.insert(KeyTargetSet::from([KeyTarget::Right]), 
-        vec![FighterMovementNode{movement: FighterMovement::Walking{velocity: WALKING_SPEED},..default()}]);
-
-        Self{ map :map}
-    }
-    pub fn movement_names(&self) -> Vec<String> {
-        let mut names = Vec::new();
-        for (_, nodes) in &self.map {
-            for node in nodes {
-                names.push(node.movement.name());
-            }
+    fn new() -> Self {
+        Self{
+            keyset_map : HashMap::new(),
+            index_map : HashMap::new()
         }
-        names
+    }
+
+    fn insert(&mut self, keyset : KeyTargetSet, movement_node : FighterMovementNode) {
+        let arc_node = Arc::new(movement_node);
+        self.index_map.insert(self.index_map.len(), Arc::clone(&arc_node));
+        if let Some(existing_nodes) = self.keyset_map.get_mut(&keyset) {
+            existing_nodes.push(arc_node);
+        } else {
+            self.keyset_map.insert(keyset, vec![arc_node]);
+        }
+    }
+
+    pub fn movement_names(&self) -> Vec<String> {
+        self.index_map.values()
+            .map(|node| node.movement.name())
+            .fold(Vec::new(), |mut acc, name| {
+            if !acc.contains(&name) {
+                acc.push(name);
+            }
+            acc
+        })
+    }
+}
+
+impl Default for FighterMovementMap {
+    fn default() -> Self {
+        let mut map = Self::new();
+        map.insert(KeyTargetSet::empty(), 
+        FighterMovementNode{movement: FighterMovement::Idle,..default()});
+        map.insert(KeyTargetSet::from([KeyTarget::Up]), 
+        FighterMovementNode{movement: FighterMovement::Jumping{inital_velocity: JUMPING_SPEED, gravity: GRAVITY}
+                            ,..default()});
+        map.insert(KeyTargetSet::from([KeyTarget::Down]), 
+        FighterMovementNode{movement: FighterMovement::Docking,..default()});
+        map.insert(KeyTargetSet::from([KeyTarget::Left]), 
+        FighterMovementNode{movement: FighterMovement::Walking{velocity: -WALKING_SPEED},..default()});
+        map.insert(KeyTargetSet::from([KeyTarget::Right]), 
+        FighterMovementNode{movement: FighterMovement::Walking{velocity: WALKING_SPEED},..default()});
+
+        map
     }
 }
 
 impl Add for FighterMovementMap {
     type Output = Self;
-    fn add(self, other: Self) -> Self {
-        let mut map = self.map;
-        map.extend(other.map);
-        Self{map : map}
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut new_map = self;
+        for (keyset, movement_nodes) in rhs.keyset_map {
+            for arc_movement_node in movement_nodes {
+                let movement_node = Arc::into_inner(arc_movement_node).unwrap();
+                new_map.insert(keyset.clone(), movement_node);
+            }
+        }
+        new_map
     }
 }
 
