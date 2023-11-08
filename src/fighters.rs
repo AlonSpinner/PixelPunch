@@ -60,13 +60,17 @@ impl FighterMovement {
     pub fn change_to(&mut self, new_movement: Self) {
         if &new_movement != self {
             *self = new_movement;
+            info!("Changed to {}", self.to_string());
         }
     }
 
     pub fn enter_position_velocity(&self, _fighter_position : &mut FighterPosition,
                                           fighter_velocity : &mut FighterVelocity) {
         match self {
-            FighterMovement::Idle => {},
+            FighterMovement::Idle => {
+                fighter_velocity.x = 0.0;
+                fighter_velocity.y = 0.0;
+            },
             FighterMovement::Jumping{inital_velocity, gravity: _} => {
                 fighter_velocity.y = *inital_velocity;
             },
@@ -88,6 +92,7 @@ impl FighterMovement {
             FighterMovement::Jumping{inital_velocity: _, gravity} => {
                 figther_position.y += fighter_velocity.y * delta_time;
                 fighter_velocity.y += (*gravity) * delta_time;
+                figther_position.x += fighter_velocity.x * delta_time;
             },
             FighterMovement::Docking => {},
             FighterMovement::Running{velocity: _} => {
@@ -166,12 +171,12 @@ impl FighterMovementMap {
         nodes.insert(KeyTargetSet::from([KeyTarget::Right]), FighterMovementNode{
             movement: FighterMovement::Walking{velocity: WALKING_SPEED},
             ..default()});
-        nodes.insert(KeyTargetSet::from([KeyTarget::Left]), FighterMovementNode{
-            movement: FighterMovement::Running{velocity: -RUNNING_SPEED},
-            ..default()});
-        nodes.insert(KeyTargetSet::from([KeyTarget::Right]), FighterMovementNode{
-            movement: FighterMovement::Running{velocity: RUNNING_SPEED},
-            ..default()});
+        // nodes.insert(KeyTargetSet::from([KeyTarget::Left]), FighterMovementNode{
+        //     movement: FighterMovement::Running{velocity: -RUNNING_SPEED},
+        //     ..default()});
+        // nodes.insert(KeyTargetSet::from([KeyTarget::Right]), FighterMovementNode{
+        //     movement: FighterMovement::Running{velocity: RUNNING_SPEED},
+        //     ..default()});
         Self{ nodes :nodes}
     }
     pub fn movements(&self) -> Vec<String> {

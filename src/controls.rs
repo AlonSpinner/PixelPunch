@@ -18,6 +18,10 @@ impl KeyTargetSet {
     pub fn empty() -> Self {
         Self(BTreeSet::new())
     }
+
+    pub fn is_subset(&self, other: &Self) -> bool {
+        self.0.is_subset(&other.0)
+    }
 }
 
 impl<const N: usize> From<[KeyTarget; N]> for KeyTargetSet {

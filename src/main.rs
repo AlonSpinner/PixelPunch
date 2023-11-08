@@ -1,6 +1,8 @@
-use bevy::{prelude::*, asset::LoadState};
+use bevy::{prelude::*,
+     asset::LoadState,
+     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},};
 use bevy_tile_atlas::TileAtlasBuilder;
-use std::collections::{HashMap,HashSet};
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 use std::path::PathBuf;
@@ -25,7 +27,10 @@ const FIGHTERS : [Fighter;2]= [Fighter::IDF, Fighter::HAMAS];
 
 fn main() {
     App::new()
-    .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+    .add_plugins((DefaultPlugins.set(ImagePlugin::default_nearest()),
+                    // FrameTimeDiagnosticsPlugin,
+                    // LogDiagnosticsPlugin::default(),
+                ))
     .add_state::<AppState>()
     .add_systems(OnEnter(AppState::Setup), load_assets)
     .add_systems(Update, check_textures_loaded.run_if(in_state(AppState::Setup)))
@@ -282,24 +287,28 @@ fn player_control(mut query: Query<(&Fighter,
         let keyset = player_controls.into_keytargetset(keyboard_input);
         let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         if let Some(new_movement_node) = fighter_graph.nodes.get(&keyset) {
-            if new_movement_node.movement.to_string() != movement.to_string() &&
-            new_movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
+            if new_movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
                 movement.change_to(new_movement_node.movement.clone());
                 movement.enter_position_velocity(&mut position, &mut velocity);
-                movement_duration.0 = 0;
             }
+        } else {
+            for (movement_key_set, new_movement_node) in fighter_graph.nodes.iter() {
+                if new_movement_node.movement == FighterMovement::Idle {continue;}
+                if movement_key_set.is_subset(&keyset) {
+                    if new_movement_node.movement.to_string() != movement.to_string() &&
+                    new_movement_node.player_enter_condition(FLOOR_Y, position.y, &previous_movement) {
+                        movement.change_to(new_movement_node.movement.clone());
+                        movement.enter_position_velocity(&mut position, &mut velocity);
+                        break;
+                    }
+                }
+            }
+        }
+        if movement.is_changed() {
+            movement_duration.0 = 0;
         } else {
             movement_duration.0 += 1; //increment movement duration by 1 frame
         }
-        // let movement_node_transition = fighter_graph.nodes.get(&movement).unwrap();
-        // if movement_node_transition.can_leave(movement_duration.0) {
-        //     for (new_movement, new_node ) in fighter_graph.nodes.iter() {
-        //         if new_node.can_enter(&controls) {
-        //             movement.change_to(new_movement.clone());
-        //             break;
-        //         }
-        //     }
-        // }
     }
 }
 fn update_state(mut query: Query<(&mut FighterPosition,
