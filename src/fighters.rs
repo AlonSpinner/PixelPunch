@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::utils::petgraph::graphmap::Nodes;
 use strum_macros::{EnumString, Display};
 use super::controls::{KeyTargetSet,KeyTarget};
 use std::collections::HashMap;
@@ -39,6 +38,18 @@ pub struct FighterPosition {
 pub struct FighterVelocity {
     pub x : f32,
     pub y : f32,
+}
+
+#[derive(Component)]
+pub struct FighterMovementStack(pub Vec<(f32, FighterMovement)>);
+
+impl FighterMovementStack {
+    pub fn insert(&mut self, elapsed_timed : f32, movement: FighterMovement) {
+        self.0.insert(0, (elapsed_timed, movement));
+        if self.0.len() > 10 {
+            self.0.truncate(10);
+        }
+    }
 }
 
 #[derive(Component)]
