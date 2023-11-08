@@ -76,6 +76,11 @@ impl FighterMovement {
         }
     }
 
+    //helper function to get the name of the movement instead of to_string
+    pub fn name(&self) -> String {
+        self.to_string()
+    }
+
     pub fn enter_position_velocity(&self, _fighter_position : &mut FighterPosition,
                                           fighter_velocity : &mut FighterVelocity) {
         match self {
@@ -119,17 +124,14 @@ impl FighterMovement {
 
 pub struct HitBox;
 
-//static data accompanying a movement
+//datatype that expands FigherMovement with static data building the FighterMovementGraph
 #[allow(dead_code)]
 pub struct FighterMovementNode {
     pub movement: FighterMovement,
     pub player_enter_condition : fn(floor_y : f32, position_y : f32, previous_movement : &FighterMovement) -> bool,
     pub player_leave_condition : fn(floor_y : f32, position_y : f32, movement_duration : usize) -> bool,
-    pub enemy_enter_condition : fn() -> bool,
-    pub enemy_leave_condition : fn() -> bool,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
-    pub evovled_node: Option<Box<FighterMovementNode>>,
 }
 
 impl FighterMovementNode {
@@ -138,19 +140,6 @@ impl FighterMovementNode {
     }
     pub fn player_leave_condition(&self, floor_y :f32,  position_y : f32, movement_duration : usize) -> bool {
         (self.player_leave_condition)(floor_y, position_y, movement_duration)
-    }
-    pub fn enemy_enter_condition(&self) -> bool {
-        (self.enemy_enter_condition)()
-    }
-    pub fn enemy_leave_condition(&self) -> bool {
-        (self.enemy_leave_condition)()
-    }
-
-    fn recursive_find_movement_names(node: &FighterMovementNode, names: &mut Vec<String>) {
-        names.push(node.movement.to_string());
-        if let Some(ref evolved_node) = node.evovled_node {
-            FighterMovementNode::recursive_find_movement_names(evolved_node, names);
-        }
     }
 }
 
@@ -161,55 +150,39 @@ impl Default for FighterMovementNode {
             movement: FighterMovement::Idle,
             player_enter_condition: |floor_y, position_y, previous_movement| position_y == floor_y,
             player_leave_condition: |floor_y, position_y, movement_duration| position_y == floor_y,
-            enemy_enter_condition: || false,
-            enemy_leave_condition: || false,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
-            evovled_node: None,
         }
     }
 }
 
 //A static graph of all possible movements for a fighter. NO DYNAMIC DATA.
 pub struct FighterMovementMap{
-    pub nodes : HashMap<KeyTargetSet,FighterMovementNode>
+    pub map : HashMap<KeyTargetSet,Vec<FighterMovementNode>>
 }
 
 impl FighterMovementMap {
     fn default() -> Self {
-        let mut nodes = HashMap::new();
-        nodes.insert(KeyTargetSet::empty(), FighterMovementNode{
-            movement: FighterMovement::Idle,
-            ..default()});
-        nodes.insert(KeyTargetSet::from([KeyTarget::Up]), FighterMovementNode{
-            movement: FighterMovement::Jumping{inital_velocity: JUMPING_SPEED, gravity: GRAVITY},
-            ..default()});
-        nodes.insert(KeyTargetSet::from([KeyTarget::Down]), FighterMovementNode{
-            movement: FighterMovement::Docking,
-            ..default()});
-        nodes.insert(KeyTargetSet::from([KeyTarget::Left]), FighterMovementNode{
-            movement: FighterMovement::Walking{velocity: -WALKING_SPEED},
-            evovled_node: Some(Box::new(FighterMovementNode{
-                                movement: FighterMovement::Running{velocity: -RUNNING_SPEED},
-                                ..default()})),
-            player_enter_condition: |floor_y, position_y, previous_movement| 
-                                    position_y == floor_y && previous_movement != &FighterMovement::Running { velocity: -RUNNING_SPEED },
-            ..default()});
-        nodes.insert(KeyTargetSet::from([KeyTarget::Right]), FighterMovementNode{
-            movement: FighterMovement::Walking{velocity: WALKING_SPEED},
-            evovled_node: Some(Box::new(FighterMovementNode{
-                                movement: FighterMovement::Running{velocity: RUNNING_SPEED},
-                                ..default()})),
-            player_enter_condition: |floor_y, position_y, previous_movement| 
-                position_y == floor_y && previous_movement != &FighterMovement::Running { velocity: RUNNING_SPEED },
-            ..default()});
-        Self{ nodes :nodes}
+        let mut map = HashMap::new();
+        map.insert(KeyTargetSet::empty(), 
+        vec![FighterMovementNode{movement: FighterMovement::Idle,..default()}]);
+        map.insert(KeyTargetSet::from([KeyTarget::Up]), 
+        vec![FighterMovementNode{movement: FighterMovement::Jumping{inital_velocity: JUMPING_SPEED, gravity: GRAVITY},..default()}]);
+        map.insert(KeyTargetSet::from([KeyTarget::Down]), 
+        vec![FighterMovementNode{movement: FighterMovement::Docking,..default()}]);
+        map.insert(KeyTargetSet::from([KeyTarget::Left]), 
+        vec![FighterMovementNode{movement: FighterMovement::Walking{velocity: -WALKING_SPEED},..default()}]);
+        map.insert(KeyTargetSet::from([KeyTarget::Right]), 
+        vec![FighterMovementNode{movement: FighterMovement::Walking{velocity: WALKING_SPEED},..default()}]);
+
+        Self{ map :map}
     }
-    pub fn movements(&self) -> Vec<String> {
+    pub fn movement_names(&self) -> Vec<String> {
         let mut names = Vec::new();
-        // Start the recursion for each top-level node
-        for node in self.nodes.values() {
-            FighterMovementNode::recursive_find_movement_names(node, &mut names);
+        for (_, nodes) in &self.map {
+            for node in nodes {
+                names.push(node.movement.name());
+            }
         }
         names
     }
@@ -218,11 +191,9 @@ impl FighterMovementMap {
 impl Add for FighterMovementMap {
     type Output = Self;
     fn add(self, other: Self) -> Self {
-        let mut nodes = self.nodes;
-        nodes.extend(other.nodes);
-        Self{
-            nodes,
-        }
+        let mut map = self.map;
+        map.extend(other.map);
+        Self{map : map}
     }
 }
 
