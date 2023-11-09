@@ -115,7 +115,7 @@ impl Default for PlayerControls {
 }
 
 impl PlayerControls {
-    pub fn into_pressed_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
+    pub fn into_persistent_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
         let mut pressed_keys = KeyTargetSet::empty();
         if keyboard_input.pressed(self.up) {
             pressed_keys = pressed_keys + KeyTarget::Up;
@@ -138,7 +138,7 @@ impl PlayerControls {
         pressed_keys
     }
 
-    pub fn into_just_pressed_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
+    pub fn into_event_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
         let mut just_pressed_keys = KeyTargetSet::empty();
         if keyboard_input.just_pressed(self.up) {
             just_pressed_keys = just_pressed_keys + KeyTarget::UpJustPressed;

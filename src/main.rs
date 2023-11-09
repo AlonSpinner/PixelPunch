@@ -38,7 +38,7 @@ fn main() {
     .add_systems(OnEnter(AppState::InGame), setup_game)
     .add_systems(
         PreUpdate,
-        player_control.run_if(in_state(AppState::InGame)),
+        player_control_persistent.run_if(in_state(AppState::InGame)),
     )
     .add_systems(
         Update,
@@ -70,7 +70,6 @@ struct PlayerBundle{
     position: FighterPosition,
     velocity: FighterVelocity,
     movement: FighterMovement,
-    movement_node_index: FighterMovementNodeIndex,
     movement_duration: FighterMovementDuration,
     keytargetset_stack : KeyTargetSetStack,
     sprite: SpriteSheetBundle,
@@ -87,7 +86,6 @@ impl Default for PlayerBundle {
             velocity : FighterVelocity{x : 0.0, y :0.0},
             movement : FighterMovement::Jumping{inital_velocity : -JUMPING_SPEED, gravity : GRAVITY},
             movement_duration : FighterMovementDuration(0),
-            movement_node_index : FighterMovementNodeIndex(1),
             keytargetset_stack : KeyTargetSetStack::new(5, 20),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
@@ -272,7 +270,6 @@ fn player_control_events(mut query: Query<(&Fighter,
                                     &mut KeyTargetSetStack,
                                     &mut FighterMovement,
                                     &mut FighterMovementDuration,
-                                    &mut FighterMovementNodeIndex,
                                     &mut FighterPosition,
                                     &mut FighterVelocity)>,
                                     keyboard_input_resource: Res<Input<KeyCode>>,
@@ -285,14 +282,19 @@ fn player_control_events(mut query: Query<(&Fighter,
         mut keytargetset_stack,
         mut movement,
         mut movement_duration,
-        mut movement_node_index,
         mut position,
         mut velocity) in query.iter_mut() {
 
-        let keyset = player_controls.into_keytargetset(keyboard_input);
+        let keyset = player_controls.into_event_keytargetset(keyboard_input);
         let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
 
-        if let Some(new_movement_node) in fighter_graph.event_map.get
+        if let Some(new_movement_node) = fighter_graph.event_map.get(&keyset) {
+            if new_movement_node.player_enter_condition(FLOOR_Y, position.y, &movement) {
+                movement.change_to(new_movement_node.movement.clone());
+                movement.enter_position_velocity(&mut position, &mut velocity);
+            }
+
+        }
     }
 }
 
@@ -301,7 +303,6 @@ fn player_control_persistent(mut query: Query<(&Fighter,
                                     &mut KeyTargetSetStack,
                                     &mut FighterMovement,
                                     &mut FighterMovementDuration,
-                                    &mut FighterMovementNodeIndex,
                                     &mut FighterPosition,
                                     &mut FighterVelocity)>,
                                     keyboard_input_resource: Res<Input<KeyCode>>,
@@ -316,65 +317,10 @@ fn player_control_persistent(mut query: Query<(&Fighter,
         mut keytargetset_stack,
         mut movement,
         mut movement_duration,
-        mut movement_node_index,
         mut position,
         mut velocity) in query.iter_mut() {
 
-        keytargetset_stack.push(player_controls.into_keytargetset(keyboard_input));
-        let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-
-        //check for just_pressed movement node, if one doesnt exist, stack pressed ones
-
-        if !fighter_graph.index_map.get(&movement_node_index.0).unwrap()
-                .player_leave_condition(FLOOR_Y, position.y, movement_duration.0) {                    
-            movement_duration.0 += 1;
-            continue;
-            }
-        
-        let mut found_movement = false;
-        //check if can enter new movement from stack
-        for (keyset, _) in keytargetset_stack.stack.iter().rev() {
-            if let Some(possible_new_movements) = fighter_graph.keyset_map.get(keyset) {    
-                for movement_node in possible_new_movements {
-                    if movement_node.index == movement_node_index.0 {continue;
-                    } else {
-                        if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement) {
-                            found_movement = true;
-                            movement_node_index.0 = movement_node.index;
-                            movement.change_to(movement_node.movement.clone());
-                            movement.enter_position_velocity(&mut position, &mut velocity);
-                            break;
-                        }
-                    }
-                }
-            //havent found movement in hashmap, maybe its in subset of keys
-            } else {
-                for (movement_node_keyset, possible_new_movement_nodes) in fighter_graph.keyset_map.iter() {
-                    if movement_node_keyset != &KeyTargetSet::empty() && movement_node_keyset.is_subset(&keyset) {
-                        for new_movement_node in possible_new_movement_nodes {
-                            if movement_node_index.0 == new_movement_node.index {continue;
-                            } else if new_movement_node.player_enter_condition(FLOOR_Y, position.y, &movement) {
-                                movement_node_index.0 = new_movement_node.index;
-                                movement.change_to(new_movement_node.movement.clone());
-                                movement.enter_position_velocity(&mut position, &mut velocity);
-                                found_movement = true;
-                                break;
-                            }
-                        }
-                    if found_movement {break;}
-                    }
-                }
-            }
-        if found_movement {break;}
         }
-        
-        if movement.is_changed() {
-            movement_duration.0 = 0;
-        } else {
-            movement_duration.0 += 1;
-        }
-        
-    }
 }
 fn update_state(mut query: Query<(&mut FighterPosition,
                                       &mut FighterVelocity,
