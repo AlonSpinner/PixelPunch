@@ -87,7 +87,7 @@ impl Default for PlayerBundle {
             velocity : FighterVelocity{x : 0.0, y :0.0},
             movement : FighterMovement::Jumping{inital_velocity : -JUMPING_SPEED, gravity : GRAVITY},
             movement_duration : FighterMovementDuration(0),
-            movement_node_index : FighterMovementNodeIndex(0),
+            movement_node_index : FighterMovementNodeIndex(1),
             keytargetset_stack : KeyTargetSetStack::new(5, 20),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
@@ -266,7 +266,8 @@ fn setup_game(
     commands.insert_resource(fighters_movement_animation_indicies);
 }
 
-fn player_control(mut query: Query<(&Fighter,
+
+fn player_control_events(mut query: Query<(&Fighter,
                                     &PlayerControls,
                                     &mut KeyTargetSetStack,
                                     &mut FighterMovement,
@@ -277,6 +278,36 @@ fn player_control(mut query: Query<(&Fighter,
                                     keyboard_input_resource: Res<Input<KeyCode>>,
                                     ) {
 
+    let keyboard_input = keyboard_input_resource.into_inner();
+
+    for (fighter,
+        player_controls,
+        mut keytargetset_stack,
+        mut movement,
+        mut movement_duration,
+        mut movement_node_index,
+        mut position,
+        mut velocity) in query.iter_mut() {
+
+        let keyset = player_controls.into_keytargetset(keyboard_input);
+        let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+
+        if let Some(new_movement_node) in fighter_graph.event_map.get
+    }
+}
+
+fn player_control_persistent(mut query: Query<(&Fighter,
+                                    &PlayerControls,
+                                    &mut KeyTargetSetStack,
+                                    &mut FighterMovement,
+                                    &mut FighterMovementDuration,
+                                    &mut FighterMovementNodeIndex,
+                                    &mut FighterPosition,
+                                    &mut FighterVelocity)>,
+                                    keyboard_input_resource: Res<Input<KeyCode>>,
+                                    ) {
+
+            
 
     let keyboard_input = keyboard_input_resource.into_inner();
 
@@ -291,6 +322,8 @@ fn player_control(mut query: Query<(&Fighter,
 
         keytargetset_stack.push(player_controls.into_keytargetset(keyboard_input));
         let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+
+        //check for just_pressed movement node, if one doesnt exist, stack pressed ones
 
         if !fighter_graph.index_map.get(&movement_node_index.0).unwrap()
                 .player_leave_condition(FLOOR_Y, position.y, movement_duration.0) {                    

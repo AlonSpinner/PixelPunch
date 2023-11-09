@@ -115,44 +115,49 @@ impl Default for PlayerControls {
 }
 
 impl PlayerControls {
-    pub fn into_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
-        let mut keytargetset = KeyTargetSet::empty();
+    pub fn into_pressed_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
+        let mut pressed_keys = KeyTargetSet::empty();
         if keyboard_input.pressed(self.up) {
-            keytargetset = keytargetset + KeyTarget::Up;
-        }
-        if keyboard_input.just_pressed(self.up) {
-            keytargetset = keytargetset + KeyTarget::UpJustPressed;
+            pressed_keys = pressed_keys + KeyTarget::Up;
         }
         if keyboard_input.pressed(self.down) {
-            keytargetset = keytargetset + KeyTarget::Down;
-        }
-        if keyboard_input.just_pressed(self.down) {
-            keytargetset = keytargetset + KeyTarget::DownJustPressed;
+            pressed_keys = pressed_keys + KeyTarget::Down;
         }
         if keyboard_input.pressed(self.left) {
-            keytargetset = keytargetset + KeyTarget::Left;
-        }
-        if keyboard_input.just_pressed(self.left) {
-            keytargetset = keytargetset + KeyTarget::LeftJustPressed;
+            pressed_keys = pressed_keys + KeyTarget::Left;
         }
         if keyboard_input.pressed(self.right) {
-            keytargetset = keytargetset + KeyTarget::Right;
-        }
-        if keyboard_input.just_pressed(self.right) {
-            keytargetset = keytargetset + KeyTarget::RightJustPressed;
+            pressed_keys = pressed_keys + KeyTarget::Right;
         }
         if keyboard_input.pressed(self.attack) {
-            keytargetset = keytargetset + KeyTarget::Attack;
-        }
-        if keyboard_input.just_pressed(self.attack) {
-            keytargetset = keytargetset + KeyTarget::AttackJustPressed;
+            pressed_keys = pressed_keys + KeyTarget::Attack;
         }
         if keyboard_input.pressed(self.defend) {
-            keytargetset = keytargetset + KeyTarget::Defend;
+            pressed_keys = pressed_keys + KeyTarget::Defend;
+        }
+        pressed_keys
+    }
+
+    pub fn into_just_pressed_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
+        let mut just_pressed_keys = KeyTargetSet::empty();
+        if keyboard_input.just_pressed(self.up) {
+            just_pressed_keys = just_pressed_keys + KeyTarget::UpJustPressed;
+        }
+        if keyboard_input.just_pressed(self.down) {
+            just_pressed_keys = just_pressed_keys + KeyTarget::DownJustPressed;
+        }
+        if keyboard_input.just_pressed(self.left) {
+            just_pressed_keys = just_pressed_keys + KeyTarget::LeftJustPressed;
+        }
+        if keyboard_input.just_pressed(self.right) {
+            just_pressed_keys = just_pressed_keys + KeyTarget::RightJustPressed;
+        }
+        if keyboard_input.just_pressed(self.attack) {
+            just_pressed_keys = just_pressed_keys + KeyTarget::AttackJustPressed;
         }
         if keyboard_input.just_pressed(self.defend) {
-            keytargetset = keytargetset + KeyTarget::DefendJustPressed;
+            just_pressed_keys = just_pressed_keys + KeyTarget::DefendJustPressed;
         }
-        keytargetset
+        just_pressed_keys
     }
 }
