@@ -57,6 +57,37 @@ impl Add <KeyTarget> for KeyTargetSet {
     }
 }
 
+#[derive(Component)]
+pub struct KeyTargetSetStack{
+    pub stack : Vec<(KeyTargetSet,usize)>,
+    pub max_size : usize,
+    pub max_duration : usize,
+}
+
+impl KeyTargetSetStack{
+    fn new(max_size : usize, max_duration : usize) -> Self {
+        Self{
+            stack : Vec::with_capacity(max_size),
+            max_size,
+            max_duration,
+        }
+    }
+    
+    fn push(&mut self, keytargetset : KeyTargetSet, ) {
+        if self.stack.len() == self.max_size {
+            self.stack.remove(0);
+        }
+        self.stack.push((keytargetset, 0));
+    }
+
+    fn update(&mut self) {
+        for (keytargetset, duration) in self.stack.iter_mut() {
+            *duration += 1;
+        }
+        self.stack.retain(|(_, duration)| *duration < self.max_duration);
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Component)]
 pub struct PlayerControls{

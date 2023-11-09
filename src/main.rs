@@ -297,7 +297,9 @@ fn player_control(mut query: Query<(&Fighter,
             continue;
             }
 
-        //check if can enter new movement from hashmap
+        //check if can enter new movement from stack
+        
+        //check if can enter new movement from current hashmap
         if let Some(possible_new_movements) = fighter_graph.keyset_map.get(&keyset) {    
             for movement_node in possible_new_movements {
                 if movement_node.index == movement_node_index.0 {continue;
