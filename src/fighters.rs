@@ -133,6 +133,7 @@ pub struct FighterMovementNode {
     pub player_leave_condition : fn(floor_y : f32, position_y : f32, movement_duration : usize) -> bool,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
+    pub index : usize,
 }
 
 impl FighterMovementNode {
@@ -149,10 +150,13 @@ impl Default for FighterMovementNode {
     fn default() -> Self {
         Self{
             movement: FighterMovement::Idle,
-            player_enter_condition: |floor_y, position_y, previous_movement| position_y == floor_y,
-            player_leave_condition: |floor_y, position_y, movement_duration| position_y == floor_y,
+            player_enter_condition: |floor_y, position_y, previous_movement|
+                                        position_y == floor_y,
+            player_leave_condition: |floor_y, position_y, movement_duration|
+                                        position_y == floor_y && movement_duration > 5,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
+            index : 0,
         }
     }
 }
@@ -171,9 +175,11 @@ impl FighterMovementMap {
         }
     }
 
-    fn insert(&mut self, keyset : KeyTargetSet, movement_node : FighterMovementNode) {
+    fn insert(&mut self, keyset : KeyTargetSet, mut movement_node : FighterMovementNode) {
+        let index = self.index_map.len();
+        movement_node.index = index;
         let arc_node = Arc::new(movement_node);
-        self.index_map.insert(self.index_map.len(), Arc::clone(&arc_node));
+        self.index_map.insert(index, Arc::clone(&arc_node));
         if let Some(existing_nodes) = self.keyset_map.get_mut(&keyset) {
             existing_nodes.push(arc_node);
         } else {
@@ -206,7 +212,16 @@ impl Default for FighterMovementMap {
         map.insert(KeyTargetSet::from([KeyTarget::Left]), 
         FighterMovementNode{movement: FighterMovement::Walking{velocity: -WALKING_SPEED},..default()});
         map.insert(KeyTargetSet::from([KeyTarget::Right]), 
-        FighterMovementNode{movement: FighterMovement::Walking{velocity: WALKING_SPEED},..default()});
+        FighterMovementNode{movement: FighterMovement::Walking{velocity: WALKING_SPEED},
+                player_enter_condition: |floor_y, position_y, previous_movement| position_y == floor_y && previous_movement.name() != "Running",
+                ..default()});
+        
+        map.insert(KeyTargetSet::from([KeyTarget::LeftJustPressed]), 
+        FighterMovementNode{movement: FighterMovement::Running{velocity: -RUNNING_SPEED},..default()});
+        map.insert(KeyTargetSet::from([KeyTarget::RightJustPressed]), 
+        FighterMovementNode{movement: FighterMovement::Running{velocity: RUNNING_SPEED},
+                player_enter_condition: |floor_y, position_y, previous_movement| position_y == floor_y && previous_movement.name() == "Walking",
+                ..default()});
 
         map
     }
@@ -227,3 +242,5 @@ impl Add for FighterMovementMap {
     }
 }
 
+#[derive(Component)]
+pub struct FighterMovementNodeIndex(pub usize);

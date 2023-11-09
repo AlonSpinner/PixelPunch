@@ -5,11 +5,17 @@ use std::ops::Add;
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Ord, PartialOrd, Debug)]
 pub enum KeyTarget{
     Up,
+    UpJustPressed,
     Down,
+    DownJustPressed,
     Left,
+    LeftJustPressed,
     Right,
+    RightJustPressed,
     Attack,
+    AttackJustPressed,
     Defend,
+    DefendJustPressed,
 }
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct KeyTargetSet(BTreeSet<KeyTarget>);
@@ -81,20 +87,38 @@ impl PlayerControls {
         if keyboard_input.pressed(self.up) {
             keytargetset = keytargetset + KeyTarget::Up;
         }
+        if keyboard_input.just_pressed(self.up) {
+            keytargetset = keytargetset + KeyTarget::UpJustPressed;
+        }
         if keyboard_input.pressed(self.down) {
             keytargetset = keytargetset + KeyTarget::Down;
+        }
+        if keyboard_input.just_pressed(self.down) {
+            keytargetset = keytargetset + KeyTarget::DownJustPressed;
         }
         if keyboard_input.pressed(self.left) {
             keytargetset = keytargetset + KeyTarget::Left;
         }
+        if keyboard_input.just_pressed(self.left) {
+            keytargetset = keytargetset + KeyTarget::LeftJustPressed;
+        }
         if keyboard_input.pressed(self.right) {
             keytargetset = keytargetset + KeyTarget::Right;
+        }
+        if keyboard_input.just_pressed(self.right) {
+            keytargetset = keytargetset + KeyTarget::RightJustPressed;
         }
         if keyboard_input.pressed(self.attack) {
             keytargetset = keytargetset + KeyTarget::Attack;
         }
+        if keyboard_input.just_pressed(self.attack) {
+            keytargetset = keytargetset + KeyTarget::AttackJustPressed;
+        }
         if keyboard_input.pressed(self.defend) {
             keytargetset = keytargetset + KeyTarget::Defend;
+        }
+        if keyboard_input.just_pressed(self.defend) {
+            keytargetset = keytargetset + KeyTarget::DefendJustPressed;
         }
         keytargetset
     }
