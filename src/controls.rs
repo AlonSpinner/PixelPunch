@@ -65,7 +65,7 @@ pub struct KeyTargetSetStack{
 }
 
 impl KeyTargetSetStack{
-    fn new(max_size : usize, max_duration : usize) -> Self {
+    pub fn new(max_size : usize, max_duration : usize) -> Self {
         Self{
             stack : Vec::with_capacity(max_size),
             max_size,
@@ -73,18 +73,20 @@ impl KeyTargetSetStack{
         }
     }
     
-    fn push(&mut self, keytargetset : KeyTargetSet, ) {
+    pub fn push(&mut self, keytargetset : KeyTargetSet, ) {
         if self.stack.len() == self.max_size {
             self.stack.remove(0);
         }
         self.stack.push((keytargetset, 0));
     }
 
-    fn update(&mut self) {
-        for (keytargetset, duration) in self.stack.iter_mut() {
+    pub fn update(&mut self) {
+        //remove expired keytargetsets
+        self.stack.retain(|(_, duration)| *duration < self.max_duration);
+        //increment duration of all keytargetsets
+        for (_, duration) in self.stack.iter_mut() {
             *duration += 1;
         }
-        self.stack.retain(|(_, duration)| *duration < self.max_duration);
     }
 }
 
@@ -106,8 +108,8 @@ impl Default for PlayerControls {
             down : KeyCode::S,
             left : KeyCode::A,
             right : KeyCode::D,
-            attack: KeyCode::F,
-            defend: KeyCode::G,
+            attack: KeyCode::G,
+            defend: KeyCode::H,
         }
     }
 }

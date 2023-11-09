@@ -42,18 +42,6 @@ pub struct FighterVelocity {
 }
 
 #[derive(Component)]
-pub struct FighterMovementStack(pub Vec<(f32, FighterMovement)>);
-
-impl FighterMovementStack {
-    pub fn insert(&mut self, elapsed_timed : f32, movement: FighterMovement) {
-        self.0.insert(0, (elapsed_timed, movement));
-        if self.0.len() > 10 {
-            self.0.truncate(10);
-        }
-    }
-}
-
-#[derive(Component)]
 pub struct FighterMovementDuration(pub usize);
 
 //All possible movements for a fighter
@@ -66,6 +54,7 @@ pub enum FighterMovement {
     Docking,
     Running{velocity : f32},
     Walking{velocity : f32},
+    Slashing,
 }
 
 impl FighterMovement {
@@ -99,6 +88,10 @@ impl FighterMovement {
             FighterMovement::Walking{velocity} => {
                 fighter_velocity.x = *velocity;
             },
+            FighterMovement::Slashing => {
+                fighter_velocity.x = 0.0;
+                fighter_velocity.y = 0.0;
+            },
         }
     }
 
@@ -119,6 +112,7 @@ impl FighterMovement {
             FighterMovement::Walking{velocity: _} => {
                 figther_position.x += fighter_velocity.x * delta_time;
             },
+            FighterMovement::Slashing => {}
         }
     }
 }
@@ -210,19 +204,24 @@ impl Default for FighterMovementMap {
         map.insert(KeyTargetSet::from([KeyTarget::Down]), 
         FighterMovementNode{movement: FighterMovement::Docking,..default()});
         map.insert(KeyTargetSet::from([KeyTarget::Left]), 
-        FighterMovementNode{movement: FighterMovement::Walking{velocity: -WALKING_SPEED},..default()});
+        FighterMovementNode{movement: FighterMovement::Walking{velocity: -WALKING_SPEED},
+                player_enter_condition: |floor_y, position_y, previous_movement| position_y == floor_y && previous_movement.name() != "Running",
+                ..default()});
         map.insert(KeyTargetSet::from([KeyTarget::Right]), 
         FighterMovementNode{movement: FighterMovement::Walking{velocity: WALKING_SPEED},
                 player_enter_condition: |floor_y, position_y, previous_movement| position_y == floor_y && previous_movement.name() != "Running",
-                ..default()});
-        
+                ..default()});       
         map.insert(KeyTargetSet::from([KeyTarget::LeftJustPressed]), 
-        FighterMovementNode{movement: FighterMovement::Running{velocity: -RUNNING_SPEED},..default()});
+        FighterMovementNode{movement: FighterMovement::Running{velocity: -RUNNING_SPEED}
+        ,..default()});
         map.insert(KeyTargetSet::from([KeyTarget::RightJustPressed]), 
         FighterMovementNode{movement: FighterMovement::Running{velocity: RUNNING_SPEED},
                 player_enter_condition: |floor_y, position_y, previous_movement| position_y == floor_y && previous_movement.name() == "Walking",
                 ..default()});
-
+        map.insert(KeyTargetSet::from([KeyTarget::Attack]),
+        FighterMovementNode{movement: FighterMovement::Slashing,
+            player_leave_condition: |floor_y, position_y, movement_duration| position_y == floor_y && movement_duration > 40,
+            ..default()});
         map
     }
 }
