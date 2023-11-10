@@ -17,6 +17,7 @@ pub enum KeyTarget{
     Defend,
     DefendJustPressed,
 }
+
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct KeyTargetSet(BTreeSet<KeyTarget>);
 
@@ -27,6 +28,10 @@ impl KeyTargetSet {
 
     pub fn is_subset(&self, other: &Self) -> bool {
         self.0.is_subset(&other.0)
+    }
+
+    pub fn is_superset(&self, other: &Self) -> bool {
+        self.0.is_superset(&other.0)
     }
 }
 
@@ -73,8 +78,12 @@ impl KeyTargetSetStack{
         }
     }
 
-    pub fn contains(&self, keytargetset : KeyTargetSet) -> bool {
-        self.stack.iter().any(|(keytargetset_, _)| keytargetset_ == &keytargetset)
+    pub fn join(&self) -> KeyTargetSet {
+        let mut joined = KeyTargetSet::empty();
+        for (keytargetset, _) in self.stack.iter() {
+            joined = joined + keytargetset.clone();
+        }
+        joined
     }
     
     pub fn push(&mut self, keytargetset : KeyTargetSet, ) {

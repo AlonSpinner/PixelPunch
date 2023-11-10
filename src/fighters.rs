@@ -76,7 +76,7 @@ pub struct FighterMovementNode {
     pub name : String,
     pub movement: FighterMovement,
     pub player_enter_condition : fn(floor_y : f32, position_y : f32,
-                                        previous_node_name : &String, keytargetset_stack : &KeyTargetSetStack) -> bool,
+                                        previous_node_name : &String, keytargetset_stack : &KeyTargetSet) -> bool,
     pub player_exit_condition : fn(floor_y : f32, position_y : f32, movement_duration : f32) -> bool,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
@@ -90,8 +90,8 @@ pub struct FighterMovementNode {
 
 impl FighterMovementNode {
     pub fn player_enter_condition(&self, floor_y : f32,  position_y : f32,
-                    previous_node_name : &String, keytargetset_stack : &KeyTargetSetStack) -> bool {
-        (self.player_enter_condition)(floor_y, position_y, previous_node_name, keytargetset_stack)
+                    previous_node_name : &String, keytargetset : &KeyTargetSet) -> bool {
+        (self.player_enter_condition)(floor_y, position_y, previous_node_name, keytargetset)
     }
     pub fn player_exit_condition(&self, floor_y :f32,  position_y : f32, movement_duration : f32) -> bool {
         (self.player_exit_condition)(floor_y, position_y, movement_duration)
@@ -220,10 +220,10 @@ impl Default for FighterMovementMap {
         FighterMovementNode{
             name : "RunningRight".to_string(),
             movement: FighterMovement::Running,
-            player_enter_condition: |floor_y,position_y, previous_node_name, keytargetset_stack| 
+            player_enter_condition: |floor_y,position_y, previous_node_name, keytargetset| 
                 position_y == floor_y && 
                 previous_node_name == "WalkingRight" && 
-                keytargetset_stack.contains(KeyTargetSet::from([KeyTarget::RightJustPressed])),
+                keytargetset.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])),
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = RUNNING_SPEED;
             },
@@ -259,7 +259,7 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
-        map.insert_to_maps(KeyTargetSet::from([KeyTarget::AttackJustPressed]),
+        map.insert_to_maps(KeyTargetSet::from([KeyTarget::AttackJustPressed, KeyTarget::DefendJustPressed]),
         FighterMovementNode{
             name : "Slashing".to_string(),
             movement: FighterMovement::Slashing,

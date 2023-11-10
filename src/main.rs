@@ -1,6 +1,6 @@
 use bevy::{prelude::*,
      asset::LoadState,
-     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},};
+     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}, ecs::event,};
 use bevy_tile_atlas::TileAtlasBuilder;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -71,7 +71,7 @@ struct PlayerBundle{
     velocity: FighterVelocity,
     movement_node_name : FighterMovementNodeName,
     movement_duration: FighterMovementDuration,
-    keytargetset_stack : KeyTargetSetStack,
+    event_keytargetset_stack : KeyTargetSetStack,
     sprite: SpriteSheetBundle,
     controls: PlayerControls,
 }
@@ -86,7 +86,7 @@ impl Default for PlayerBundle {
             velocity : FighterVelocity{x : 0.0, y :0.0},
             movement_node_name : FighterMovementNodeName("InAir".to_string()),
             movement_duration : FighterMovementDuration(0.0),
-            keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
+            event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
         }
@@ -279,7 +279,7 @@ fn player_control(mut query: Query<(&Fighter,
 
     for (fighter,
         player_controls,
-        mut keytargetset_stack,
+        mut event_keytargetset_stack,
         mut movement_duration,
         mut movement_node_name,
         mut position,
@@ -288,29 +288,34 @@ fn player_control(mut query: Query<(&Fighter,
         let persistent_keytargetset = player_controls.into_persistent_keytargetset(&keyboard_input);
         let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-        keytargetset_stack.update(time.delta_seconds());
+        event_keytargetset_stack.update(time.delta_seconds());
+        
+        if event_keytargetset != KeyTargetSet::empty() {event_keytargetset_stack.push(event_keytargetset);}
+        let joined_event_keytargetset = event_keytargetset_stack.join();
 
+        //if cant exist movement
         if !fighter_map.name_map.get(&movement_node_name.0).unwrap()
                 .player_exit_condition(FLOOR_Y, position.y, movement_duration.0) {
             movement_duration.0 += time.delta_seconds();
 
-        } else if event_keytargetset!= KeyTargetSet::empty() {
-                if let Some(movement_node) = fighter_map.keyset_map.get(&event_keytargetset) {
-                    if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &keytargetset_stack) {
-                        movement_node.enter(&mut position, &mut velocity);
-                        movement_duration.0 = 0.0;
-                        movement_node_name.0 = movement_node.name.clone();
-                        keytargetset_stack.push(event_keytargetset);
-                    }
-                }
-        } else if let Some(movement_node) = fighter_map.keyset_map.get(&persistent_keytargetset) {
-            if movement_node.name != movement_node_name.0 && 
-                    movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &keytargetset_stack) {
+        //check for events
+        } else if let Some(movement_node) = fighter_map.keyset_map.get(&joined_event_keytargetset) {
+            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &joined_event_keytargetset) {
                 movement_node.enter(&mut position, &mut velocity);
                 movement_duration.0 = 0.0;
                 movement_node_name.0 = movement_node.name.clone();
-                keytargetset_stack.push(persistent_keytargetset);
             }
+        //check for persistent movements
+        } else if let Some(movement_node) = fighter_map.keyset_map.get(&persistent_keytargetset) {
+            if movement_node.name != movement_node_name.0 && 
+                    movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &persistent_keytargetset) {
+                movement_node.enter(&mut position, &mut velocity);
+                movement_duration.0 = 0.0;
+                movement_node_name.0 = movement_node.name.clone();
+            }
+        } else if movement_node_name.0 != "Idle".to_string() {
+            movement_duration.0 = 0.0;
+            movement_node_name.0 = "Idle".to_string();
         }
     
         if movement_node_name.is_changed() {
