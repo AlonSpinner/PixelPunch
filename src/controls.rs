@@ -160,4 +160,8 @@ impl PlayerControls {
         }
         just_pressed_keys
     }
+
+    pub fn into_full_keytargetset(&self, keyboard_input : &Input<KeyCode>) -> KeyTargetSet {
+        self.into_persistent_keytargetset(keyboard_input) + self.into_event_keytargetset(keyboard_input)
+    }
 }
