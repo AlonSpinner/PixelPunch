@@ -128,16 +128,16 @@ impl Default for FighterMovementNode {
 
 //A static graph of all possible movements for a fighter. NO DYNAMIC DATA.
 pub struct FighterMovementMap {
-    pub event_keyset_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
-    pub persistent_keyset_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
+    pub event_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
+    pub persistent_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
     pub name_map : HashMap<String, Arc<FighterMovementNode>>,
 }
 
 impl FighterMovementMap {
     fn new() -> Self {
         Self{
-            event_keyset_map : HashMap::new(),
-            persistent_keyset_map : HashMap::new(),
+            event_map : HashMap::new(),
+            persistent_map : HashMap::new(),
             name_map : HashMap::new(),
         }
     }
@@ -157,23 +157,38 @@ impl FighterMovementMap {
     self
     }
 
-    pub fn insert_to_event_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
-        if self.name_map.contains_key(&node.name) {
-            panic!("Keyset {} already exists in the map", &node.name);
-        } else if self.keyset_map.contains_key(&keyset) {
-            panic!("Keyset {:?} already exists in the map", &keyset);
-        } else {
-        let node_name = node.name.clone();
-        let arc_movement_node = Arc::new(node);
-        self.name_map.insert(node_name, arc_movement_node.clone());
-        self.keyset_map.insert(keyset, arc_movement_node);
+    fn check_if_can_insert_node(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
+        if self.event_map.contains_key(&keyset) {
+            panic!("Keyset {:?} already contained in event_map", &keyset);
+        } else if self.persistent_map.contains_key(&keyset) {
+            panic!("Keyset {:?} already contained in the persistent_map", &keyset);
+        } else if {
+            self.name_map.contains_key(&node.name)
+        } {
+            panic!("Node with name {} already contained in the name_map", &node.name);
         }
     }
 
+    pub fn insert_to_event_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
+        self.check_if_can_insert_node(keyset, node);
+        let node_name = node.name.clone();
+        let arc_movement_node = Arc::new(node);
+        self.name_map.insert(node_name, arc_movement_node.clone());
+        self.event_map.insert(keyset, arc_movement_node);
+    }
+
+    pub fn insert_to_peristent_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
+        self.check_if_can_insert_node(keyset, node);
+        let node_name = node.name.clone();
+        let arc_movement_node = Arc::new(node);
+        self.name_map.insert(node_name, arc_movement_node.clone());
+        self.persistent_map.insert(keyset, arc_movement_node);
+    }
+
     //by_name map may contain nodes that are not in the keyset_map
-    pub fn insert_to_by_name(&mut self, node : FighterMovementNode) {
+    pub fn insert_to_name_map(&mut self, node : FighterMovementNode) {
         if self.name_map.contains_key(&node.name) {
-            panic!("Keyset {} already exists in the map", &node.name);
+            panic!("node with that name {} already exists in the map", &node.name);
         } else {
         let node_name = node.name.clone();
         let arc_movement_node = Arc::new(node);
