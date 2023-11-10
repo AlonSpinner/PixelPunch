@@ -72,6 +72,10 @@ impl KeyTargetSetStack{
             max_duration,
         }
     }
+
+    pub fn contains(&self, keytargetset : KeyTargetSet) -> bool {
+        self.stack.iter().any(|(keytargetset_, _)| keytargetset_ == &keytargetset)
+    }
     
     pub fn push(&mut self, keytargetset : KeyTargetSet, ) {
         if self.stack.len() == self.max_size {

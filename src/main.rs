@@ -86,7 +86,7 @@ impl Default for PlayerBundle {
             velocity : FighterVelocity{x : 0.0, y :0.0},
             movement_node_name : FighterMovementNodeName("InAir".to_string()),
             movement_duration : FighterMovementDuration(0.0),
-            keytargetset_stack : KeyTargetSetStack::new(5, 1.0),
+            keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
         }
@@ -275,9 +275,6 @@ fn player_control(mut query: Query<(&Fighter,
                                     keyboard_input_resource: Res<Input<KeyCode>>,
                                     time: Res<Time>,
                                     ) {
-
-            
-
     let keyboard_input = keyboard_input_resource.into_inner();
 
     for (fighter,
@@ -288,17 +285,18 @@ fn player_control(mut query: Query<(&Fighter,
         mut position,
         mut velocity) in query.iter_mut() {
 
-        
         let persistent_keytargetset = player_controls.into_persistent_keytargetset(&keyboard_input);
         let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+        keytargetset_stack.update(time.delta_seconds());
 
-
-        if !fighter_map.name_map.get(&movement_node_name.0).unwrap().player_exit_condition(FLOOR_Y, position.y, movement_duration.0) {
+        if !fighter_map.name_map.get(&movement_node_name.0).unwrap()
+                .player_exit_condition(FLOOR_Y, position.y, movement_duration.0) {
             movement_duration.0 += time.delta_seconds();
+
         } else if event_keytargetset!= KeyTargetSet::empty() {
                 if let Some(movement_node) = fighter_map.keyset_map.get(&event_keytargetset) {
-                    if movement_node.player_enter_condition(FLOOR_Y, position.y) {
+                    if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &keytargetset_stack) {
                         movement_node.enter(&mut position, &mut velocity);
                         movement_duration.0 = 0.0;
                         movement_node_name.0 = movement_node.name.clone();
@@ -306,7 +304,8 @@ fn player_control(mut query: Query<(&Fighter,
                     }
                 }
         } else if let Some(movement_node) = fighter_map.keyset_map.get(&persistent_keytargetset) {
-            if movement_node.player_enter_condition(FLOOR_Y, position.y) {
+            if movement_node.name != movement_node_name.0 && 
+                    movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &keytargetset_stack) {
                 movement_node.enter(&mut position, &mut velocity);
                 movement_duration.0 = 0.0;
                 movement_node_name.0 = movement_node.name.clone();
@@ -314,6 +313,9 @@ fn player_control(mut query: Query<(&Fighter,
             }
         }
     
+        if movement_node_name.is_changed() {
+            info!("fighter {} changed movement to {}", fighter.to_string(), movement_node_name.0);
+        }
     }
 }
 fn update_state(mut query: Query<(&Fighter,
