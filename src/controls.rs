@@ -59,13 +59,13 @@ impl Add <KeyTarget> for KeyTargetSet {
 
 #[derive(Component)]
 pub struct KeyTargetSetStack{
-    pub stack : Vec<(KeyTargetSet,usize)>,
+    pub stack : Vec<(KeyTargetSet,f32)>,
     pub max_size : usize,
-    pub max_duration : usize,
+    pub max_duration : f32,
 }
 
 impl KeyTargetSetStack{
-    pub fn new(max_size : usize, max_duration : usize) -> Self {
+    pub fn new(max_size : usize, max_duration : f32) -> Self {
         Self{
             stack : Vec::with_capacity(max_size),
             max_size,
@@ -77,15 +77,15 @@ impl KeyTargetSetStack{
         if self.stack.len() == self.max_size {
             self.stack.remove(0);
         }
-        self.stack.push((keytargetset, 0));
+        self.stack.push((keytargetset, 0.0));
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self, delta_time : f32) {
         //remove expired keytargetsets
         self.stack.retain(|(_, duration)| *duration < self.max_duration);
         //increment duration of all keytargetsets
         for (_, duration) in self.stack.iter_mut() {
-            *duration += 1;
+            *duration += delta_time;
         }
     }
 }

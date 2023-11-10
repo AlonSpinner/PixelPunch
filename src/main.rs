@@ -38,7 +38,7 @@ fn main() {
     .add_systems(OnEnter(AppState::InGame), setup_game)
     .add_systems(
         PreUpdate,
-        player_control_persistent.run_if(in_state(AppState::InGame)),
+        player_control.run_if(in_state(AppState::InGame)),
     )
     .add_systems(
         Update,
@@ -69,7 +69,7 @@ struct PlayerBundle{
     health: FighterHealth,
     position: FighterPosition,
     velocity: FighterVelocity,
-    movement: FighterMovement,
+    movement_node_name : FighterMovementNodeName,
     movement_duration: FighterMovementDuration,
     keytargetset_stack : KeyTargetSetStack,
     sprite: SpriteSheetBundle,
@@ -84,9 +84,9 @@ impl Default for PlayerBundle {
             health : FighterHealth(100.0),
             position : FighterPosition{x : 0.0, y :0.0},
             velocity : FighterVelocity{x : 0.0, y :0.0},
-            movement : FighterMovement::Jumping{inital_velocity : -JUMPING_SPEED, gravity : GRAVITY},
+            movement_node_name : FighterMovementNodeName("Idle".to_string()),
             movement_duration : FighterMovementDuration(0),
-            keytargetset_stack : KeyTargetSetStack::new(5, 20),
+            keytargetset_stack : KeyTargetSetStack::new(5, 1.0),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
         }
@@ -126,15 +126,15 @@ fn load_assets(mut commands: Commands,
     for fighter in FIGHTERS {
         let fighter_movement_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
-        for movement_name in fighter_movement_graph.movement_names() {
+        for sprite_name in fighter_movement_graph.name_map.values().map(|x| x.sprite_name.clone()) {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
-            let path = PathBuf::from("textures").join(fighter.to_string()).join(&movement_name);
+            let path = PathBuf::from("textures").join(fighter.to_string()).join(&sprite_name);
             let untyped_handles = asset_server.load_folder(path).unwrap();
             for handle in untyped_handles.iter() {
                 let image_handle = handle.clone().typed();
                 sprites_vec.push(image_handle);
             }
-        fighter_movement_sprites.insert(movement_name.clone(), sprites_vec);
+        fighter_movement_sprites.insert(sprite_name.clone(), sprites_vec);
         }
         assets.fighters_movement_sprites.insert(fighter, fighter_movement_sprites);
     }
@@ -265,43 +265,9 @@ fn setup_game(
 }
 
 
-fn player_control_events(mut query: Query<(&Fighter,
+fn player_control(mut query: Query<(&Fighter,
                                     &PlayerControls,
                                     &mut KeyTargetSetStack,
-                                    &mut FighterMovement,
-                                    &mut FighterMovementDuration,
-                                    &mut FighterPosition,
-                                    &mut FighterVelocity)>,
-                                    keyboard_input_resource: Res<Input<KeyCode>>,
-                                    ) {
-
-    let keyboard_input = keyboard_input_resource.into_inner();
-
-    for (fighter,
-        player_controls,
-        mut keytargetset_stack,
-        mut movement,
-        mut movement_duration,
-        mut position,
-        mut velocity) in query.iter_mut() {
-
-        let keyset = player_controls.into_event_keytargetset(keyboard_input);
-        let fighter_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-
-        if let Some(new_movement_node) = fighter_graph.event_map.get(&keyset) {
-            if new_movement_node.player_enter_condition(FLOOR_Y, position.y, &movement) {
-                movement.change_to(new_movement_node.movement.clone());
-                movement.enter_position_velocity(&mut position, &mut velocity);
-            }
-
-        }
-    }
-}
-
-fn player_control_persistent(mut query: Query<(&Fighter,
-                                    &PlayerControls,
-                                    &mut KeyTargetSetStack,
-                                    &mut FighterMovement,
                                     &mut FighterMovementDuration,
                                     &mut FighterPosition,
                                     &mut FighterVelocity)>,
@@ -315,24 +281,26 @@ fn player_control_persistent(mut query: Query<(&Fighter,
     for (fighter,
         player_controls,
         mut keytargetset_stack,
-        mut movement,
         mut movement_duration,
         mut position,
         mut velocity) in query.iter_mut() {
-
-        }
+    }
 }
-fn update_state(mut query: Query<(&mut FighterPosition,
-                                      &mut FighterVelocity,
-                                      &mut FighterMovement)>,
-                                      time: Res<Time>,) {
+fn update_state(mut query: Query<(&Fighter,
+                                    &mut FighterPosition,
+                                    &mut FighterVelocity,
+                                    &FighterMovementNodeName,)>,
+                                    time: Res<Time>,) {
     let dt = time.delta_seconds();
     
-    for (mut position,
-         mut velocity,
-        movement) in query.iter_mut() {
+    for (fighter,
+        mut position,
+        mut velocity,
+        movement_node_index) in query.iter_mut() {
+
+        let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap().name_map.get(&movement_node_index.0).unwrap();
         
-        movement.update_position_velocity(&mut position, &mut velocity, dt);
+        movement_node.update(&mut position, &mut velocity, dt);
         position.x = position.x.clamp(LEFT_WALL_X,RIGHT_WALL_X);
         position.y = position.y.clamp(FLOOR_Y, CEILING_Y);
     }
@@ -342,23 +310,26 @@ fn draw_fighters(time: Res<Time>,
                 fighters_movement_animation_indicies: Res<FightersMovementAnimationIndicies>,
                 mut animation_timer: ResMut<AnimationTimer>,
                 mut query: Query<(&Fighter,
-                               &FighterPosition,
-                               &FighterVelocity,
-                               Ref<FighterMovement>,
-                               &mut TextureAtlasSprite,
-                               &mut Transform,)>) {
+                                &FighterMovementNodeName,
+                                &FighterPosition,
+                                &FighterVelocity,
+                                &mut TextureAtlasSprite,
+                                &mut Transform,)>) {
     
     animation_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
     for (fighter,
-         position,
-         velocity,
-         movement,
-         mut sprite,
-         mut transform) in query.iter_mut() {
+        movement_node_name,
+        position,
+        velocity,
+        mut sprite,
+        mut transform) in query.iter_mut() {
+
+        let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap().name_map.get(&movement_node_name.0).unwrap();
+        let sprite_name = &movement_node.sprite_name;
         
         if animation_timer.just_finished() {
             let movement_indicies = fighters_movement_animation_indicies.0.get(&fighter).unwrap()
-                                                                                .hashmap.get(&movement.to_string()).unwrap();
+                                                                                .hashmap.get(sprite_name).unwrap();
             if sprite.index < movement_indicies[0] || sprite.index > movement_indicies[1]-1 {
                 sprite.index = movement_indicies[0];
             } else {
