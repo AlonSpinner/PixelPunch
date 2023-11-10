@@ -299,11 +299,13 @@ fn player_control(mut query: Query<(&Fighter,
             movement_duration.0 += time.delta_seconds();
 
         //check for events
-        } else if let Some(movement_node) = fighter_map.keyset_map.get(&joined_event_keytargetset) {
-            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &joined_event_keytargetset) {
-                movement_node.enter(&mut position, &mut velocity);
-                movement_duration.0 = 0.0;
-                movement_node_name.0 = movement_node.name.clone();
+        } else if joined_event_keytargetset != KeyTargetSet::empty() {
+            if let Some(movement_node) = fighter_map.keyset_map.get(&joined_event_keytargetset) {
+                if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &joined_event_keytargetset) {
+                    movement_node.enter(&mut position, &mut velocity);
+                    movement_duration.0 = 0.0;
+                    movement_node_name.0 = movement_node.name.clone();
+                }
             }
         //check for persistent movements
         } else if let Some(movement_node) = fighter_map.keyset_map.get(&persistent_keytargetset) {

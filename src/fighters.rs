@@ -128,14 +128,16 @@ impl Default for FighterMovementNode {
 
 //A static graph of all possible movements for a fighter. NO DYNAMIC DATA.
 pub struct FighterMovementMap {
-    pub keyset_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
+    pub event_keyset_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
+    pub persistent_keyset_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
     pub name_map : HashMap<String, Arc<FighterMovementNode>>,
 }
 
 impl FighterMovementMap {
     fn new() -> Self {
         Self{
-            keyset_map : HashMap::new(),
+            event_keyset_map : HashMap::new(),
+            persistent_keyset_map : HashMap::new(),
             name_map : HashMap::new(),
         }
     }
@@ -155,7 +157,7 @@ impl FighterMovementMap {
     self
     }
 
-    pub fn insert_to_maps(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
+    pub fn insert_to_event_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
         if self.name_map.contains_key(&node.name) {
             panic!("Keyset {} already exists in the map", &node.name);
         } else if self.keyset_map.contains_key(&keyset) {
@@ -216,20 +218,20 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
-        map.insert_to_maps(KeyTargetSet::from([KeyTarget::RightJustPressed]),
-        FighterMovementNode{
-            name : "RunningRight".to_string(),
-            movement: FighterMovement::Running,
-            player_enter_condition: |floor_y,position_y, previous_node_name, keytargetset| 
-                position_y == floor_y && 
-                previous_node_name == "WalkingRight" && 
-                keytargetset.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])),
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = RUNNING_SPEED;
-            },
-            sprite_name: "Running".to_string(),
-            ..default()}
-        );
+        // map.insert_to_maps(KeyTargetSet::from([KeyTarget::RightJustPressed]),
+        // FighterMovementNode{
+        //     name : "RunningRight".to_string(),
+        //     movement: FighterMovement::Running,
+        //     player_enter_condition: |floor_y,position_y, previous_node_name, keytargetset| 
+        //         position_y == floor_y && 
+        //         previous_node_name == "WalkingRight" && 
+        //         keytargetset.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])),
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = RUNNING_SPEED;
+        //     },
+        //     sprite_name: "Running".to_string(),
+        //     ..default()}
+        // );
 
         map.insert_to_maps(KeyTargetSet::from([KeyTarget::Down]),
         FighterMovementNode{
