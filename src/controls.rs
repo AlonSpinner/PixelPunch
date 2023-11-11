@@ -86,7 +86,7 @@ impl KeyTargetSetStack{
         joined
     }
     
-    pub fn push(&mut self, keytargetset : KeyTargetSet, ) {
+    pub fn push(&mut self, keytargetset : KeyTargetSet) {
         if self.stack.len() == self.max_size {
             self.stack.remove(0);
         }

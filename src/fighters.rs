@@ -157,20 +157,20 @@ impl FighterMovementMap {
     self
     }
 
-    fn check_if_can_insert_node(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
+    fn check_if_can_insert_node(&mut self, keyset : &KeyTargetSet, node : &FighterMovementNode) {
         if self.event_map.contains_key(&keyset) {
-            panic!("Keyset {:?} already contained in event_map", &keyset);
-        } else if self.persistent_map.contains_key(&keyset) {
-            panic!("Keyset {:?} already contained in the persistent_map", &keyset);
+            panic!("Keyset {:?} already contained in event_map", keyset);
+        } else if self.persistent_map.contains_key(keyset) {
+            panic!("Keyset {:?} already contained in the persistent_map", keyset);
         } else if {
             self.name_map.contains_key(&node.name)
         } {
-            panic!("Node with name {} already contained in the name_map", &node.name);
+            panic!("Node with name {} already contained in the name_map", node.name);
         }
     }
 
     pub fn insert_to_event_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
-        self.check_if_can_insert_node(keyset, node);
+        self.check_if_can_insert_node(&keyset, &node);
         let node_name = node.name.clone();
         let arc_movement_node = Arc::new(node);
         self.name_map.insert(node_name, arc_movement_node.clone());
@@ -178,7 +178,7 @@ impl FighterMovementMap {
     }
 
     pub fn insert_to_peristent_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
-        self.check_if_can_insert_node(keyset, node);
+        self.check_if_can_insert_node(&keyset, &node);
         let node_name = node.name.clone();
         let arc_movement_node = Arc::new(node);
         self.name_map.insert(node_name, arc_movement_node.clone());
@@ -200,10 +200,9 @@ impl FighterMovementMap {
 impl Default for FighterMovementMap {
     fn default() -> Self {
         let mut map = Self::new();
-        map.insert_to_maps(KeyTargetSet::empty(),
-        FighterMovementNode::default());
+        map.insert_to_name_map(FighterMovementNode::default());
 
-        map.insert_to_maps(KeyTargetSet::from([KeyTarget::Right]),
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
         FighterMovementNode{
             name : "WalkingRight".to_string(),
             movement: FighterMovement::Walking,
@@ -219,7 +218,7 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
-        map.insert_to_maps(KeyTargetSet::from([KeyTarget::Left]),
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Left]),
         FighterMovementNode{
             name : "WalkingLeft".to_string(),
             movement: FighterMovement::Walking,
@@ -248,7 +247,7 @@ impl Default for FighterMovementMap {
         //     ..default()}
         // );
 
-        map.insert_to_maps(KeyTargetSet::from([KeyTarget::Down]),
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
         FighterMovementNode{
             name : "Docking".to_string(),
             movement: FighterMovement::Docking,
@@ -260,7 +259,7 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
-        map.insert_to_maps(KeyTargetSet::from([KeyTarget::UpJustPressed]),
+        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::UpJustPressed]),
         FighterMovementNode{
             name : "Jump".to_string(),
             movement: FighterMovement::Jumping,
@@ -276,7 +275,7 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
-        map.insert_to_maps(KeyTargetSet::from([KeyTarget::AttackJustPressed, KeyTarget::DefendJustPressed]),
+        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed, KeyTarget::DefendJustPressed]),
         FighterMovementNode{
             name : "Slashing".to_string(),
             movement: FighterMovement::Slashing,
@@ -290,7 +289,7 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
-        map.insert_to_by_name(
+        map.insert_to_name_map(
         FighterMovementNode{
             name : "InAir".to_string(),
             movement: FighterMovement::InAir,
