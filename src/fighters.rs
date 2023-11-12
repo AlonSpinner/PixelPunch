@@ -75,9 +75,13 @@ pub struct HitBox;
 pub struct FighterMovementNode {
     pub name : String,
     pub movement: FighterMovement,
-    pub player_enter_condition : fn(floor_y : f32, position_y : f32,
-                                        previous_node_name : &String, keytargetset_stack : &KeyTargetSet) -> bool,
-    pub player_exit_condition : fn(floor_y : f32, position_y : f32, movement_duration : f32) -> bool,
+    pub player_enter_condition : fn(floor_y : f32,
+                                    position_y : f32,
+                                    previous_node_name : &String,) -> bool,
+    pub player_exit_condition : fn(floor_y : f32,
+                                    position_y : f32,
+                                    movement_duration : f32,
+                                    keyset : &KeyTargetSet) -> bool,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
     pub update : fn(fighter_position : &mut FighterPosition,
@@ -89,12 +93,11 @@ pub struct FighterMovementNode {
 }
 
 impl FighterMovementNode {
-    pub fn player_enter_condition(&self, floor_y : f32,  position_y : f32,
-                    previous_node_name : &String, keytargetset : &KeyTargetSet) -> bool {
-        (self.player_enter_condition)(floor_y, position_y, previous_node_name, keytargetset)
+    pub fn player_enter_condition(&self, floor_y : f32,  position_y : f32, previous_node_name : &String) -> bool {
+        (self.player_enter_condition)(floor_y, position_y, previous_node_name)
     }
-    pub fn player_exit_condition(&self, floor_y :f32,  position_y : f32, movement_duration : f32) -> bool {
-        (self.player_exit_condition)(floor_y, position_y, movement_duration)
+    pub fn player_exit_condition(&self, floor_y :f32,  position_y : f32, movement_duration : f32, keyset : &KeyTargetSet) -> bool {
+        (self.player_exit_condition)(floor_y, position_y, movement_duration, keyset)
     }
     pub fn update(&self, fighter_position : &mut FighterPosition,
                          fighter_velocity : &mut FighterVelocity,
@@ -117,8 +120,8 @@ impl Default for FighterMovementNode {
                 fighter_velocity.y = 0.0;
             },
             update: |_,_,_| {},
-            player_enter_condition: |floor_y,position_y,_,_| position_y == floor_y,
-            player_exit_condition: |floor_y,position_y,_| position_y == floor_y,
+            player_enter_condition: |floor_y,position_y,_| position_y == floor_y,
+            player_exit_condition: |floor_y,position_y,_,_| position_y == floor_y,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
             sprite_name: "Idle".to_string(),
@@ -201,12 +204,12 @@ impl Default for FighterMovementMap {
     fn default() -> Self {
         let mut map = Self::new();
         map.insert_to_name_map(FighterMovementNode::default());
-
+                    
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
         FighterMovementNode{
             name : "WalkingRight".to_string(),
             movement: FighterMovement::Walking,
-            player_exit_condition: |floor_y, position_y, movement_duration| 
+            player_exit_condition: |floor_y, position_y, movement_duration,_| 
                 position_y == floor_y && movement_duration > 0.1,
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = WALKING_SPEED;
@@ -215,6 +218,26 @@ impl Default for FighterMovementMap {
                 fighter_position.x += fighter_velocity.x * delta_time;
             },
             sprite_name: "Walking".to_string(),
+            ..default()}
+        );
+
+        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
+        FighterMovementNode{
+            name : "RunningRight".to_string(),
+            movement: FighterMovement::Running,
+            player_enter_condition: |floor_y,position_y, previous_node_name| 
+                position_y == floor_y && 
+                previous_node_name == "WalkingRight",
+            player_exit_condition: |floor_y, position_y, movement_duration, keyset| {
+                keyset != &KeyTargetSet::empty()
+            },
+            enter: |_, fighter_velocity| {
+                fighter_velocity.x = RUNNING_SPEED;
+            },
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.x += fighter_velocity.x * delta_time
+            },
+            sprite_name: "Running".to_string(),
             ..default()}
         );
 
@@ -231,21 +254,6 @@ impl Default for FighterMovementMap {
             sprite_name: "Walking".to_string(),
             ..default()}
         );
-
-        // map.insert_to_maps(KeyTargetSet::from([KeyTarget::RightJustPressed]),
-        // FighterMovementNode{
-        //     name : "RunningRight".to_string(),
-        //     movement: FighterMovement::Running,
-        //     player_enter_condition: |floor_y,position_y, previous_node_name, keytargetset| 
-        //         position_y == floor_y && 
-        //         previous_node_name == "WalkingRight" && 
-        //         keytargetset.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])),
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.x = RUNNING_SPEED;
-        //     },
-        //     sprite_name: "Running".to_string(),
-        //     ..default()}
-        // );
 
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
         FighterMovementNode{
@@ -283,7 +291,7 @@ impl Default for FighterMovementMap {
                 fighter_velocity.x = 0.0;
                 fighter_velocity.y = 0.0;
             },
-            player_exit_condition: |floor_y, position_y,movement_duration| 
+            player_exit_condition: |floor_y, position_y,movement_duration,_| 
                 floor_y == position_y && movement_duration > 0.5,
             sprite_name: "Slashing".to_string(),
             ..default()}

@@ -289,35 +289,41 @@ fn player_control(mut query: Query<(&Fighter,
         let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         event_keytargetset_stack.update(time.delta_seconds());
-        
-        event_keytargetset_stack.push(event_keytargetset);
-        let joined_event_keytargetset = event_keytargetset_stack.join();
 
         //if cant exist movement
+        let keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
         if !fighter_map.name_map.get(&movement_node_name.0).unwrap()
-                .player_exit_condition(FLOOR_Y, position.y, movement_duration.0) {
+                .player_exit_condition(FLOOR_Y, position.y, movement_duration.0, &keytargetset) {
             movement_duration.0 += time.delta_seconds();
+            continue;
+        }
 
+        event_keytargetset_stack.push(event_keytargetset);
+        let joined_event_keytargetset = event_keytargetset_stack.join();
         //check for events
-        } else if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
-            // info!("got here");
-            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &joined_event_keytargetset) {
+        if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
+            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0) {
                 movement_node.enter(&mut position, &mut velocity);
                 movement_duration.0 = 0.0;
                 movement_node_name.0 = movement_node.name.clone();
+                continue;
             }
+        }
         // check for persistent movements
-        } else if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
-            if movement_node.name != movement_node_name.0 && movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0, &persistent_keytargetset) {
+        if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
+            if movement_node.name != movement_node_name.0 && movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0) {
                 movement_node.enter(&mut position, &mut velocity);
                 movement_duration.0 = 0.0;
                 movement_node_name.0 = movement_node.name.clone();
+                continue;
             }
-        } else if movement_node_name.0 != "Idle".to_string() {
+        }
+        if movement_node_name.0 != "Idle".to_string() {
             let movement_node = fighter_map.name_map.get(&"Idle".to_string()).unwrap();
             movement_node.enter(&mut position, &mut velocity);
             movement_duration.0 = 0.0;
             movement_node_name.0 = "Idle".to_string();
+            continue;
         }
     
         if movement_node_name.is_changed() {
