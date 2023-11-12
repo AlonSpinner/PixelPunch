@@ -306,15 +306,18 @@ fn player_control(mut query: Query<(&Fighter,
                 movement_node.enter(&mut position, &mut velocity);
                 movement_duration.0 = 0.0;
                 movement_node_name.0 = movement_node.name.clone();
+                info!("fighter {} changed movement to {}", fighter.to_string(), movement_node_name.0);
                 continue;
             }
         }
         // check for persistent movements
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
-            if movement_node.name != movement_node_name.0 && movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0) {
+            if movement_node.name == movement_node_name.0 {continue};
+            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0) {
                 movement_node.enter(&mut position, &mut velocity);
                 movement_duration.0 = 0.0;
                 movement_node_name.0 = movement_node.name.clone();
+                info!("fighter {} changed movement to {}", fighter.to_string(), movement_node_name.0);
                 continue;
             }
         }
@@ -323,11 +326,9 @@ fn player_control(mut query: Query<(&Fighter,
             movement_node.enter(&mut position, &mut velocity);
             movement_duration.0 = 0.0;
             movement_node_name.0 = "Idle".to_string();
-            continue;
-        }
-    
-        if movement_node_name.is_changed() {
+            
             info!("fighter {} changed movement to {}", fighter.to_string(), movement_node_name.0);
+            continue;
         }
     }
 }
