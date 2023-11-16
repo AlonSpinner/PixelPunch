@@ -243,14 +243,14 @@ impl Default for FighterMovementMap {
         FighterMovementNode{
             movement: FighterMovement::RunningRight,
             player_enter_condition: |floor_y,position_y,
-                                     _,
-                                     keyset_stack| {
+                                     fighter_movement_stack,
+                                     event_keyset_stack| {
                 let window_time = 0.3;
                 let cond1 = position_y == floor_y;
 
-                //search for double pressed in windo
+                //search for double pressed in window
                 let mut pressed = 0;
-                for timed_keyset in keyset_stack.0.stack.iter().rev() {
+                for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
                     if timed_keyset.1 > window_time {break};
                     if timed_keyset.0.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])) {
                         pressed += 1;
@@ -258,7 +258,15 @@ impl Default for FighterMovementMap {
                 }
                 let cond2 = pressed > 1;
 
-                cond1 & cond2
+                //make sure window is only filled with idle/walking right
+                let mut cond3 = true;
+                if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
+                    if last_movement.0 != FighterMovement::Idle && last_movement.0 != FighterMovement::WalkingRight {
+                        cond3 = false;
+                    }
+                }
+
+                cond1 & cond2 & cond3
             },
             player_exit_condition: |_, _, _, keyset| {keyset != &KeyTargetSet::empty()},
             enter: |_, fighter_velocity| {fighter_velocity.x = RUNNING_SPEED;},

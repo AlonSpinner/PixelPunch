@@ -1,3 +1,8 @@
+pub struct TimeTaggedValue<T> {
+    value : T,
+    duration : f32,
+}
+
 pub struct TimeTaggedStack<T>
 where
 T: std::fmt::Debug, 

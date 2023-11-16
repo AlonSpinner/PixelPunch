@@ -1,6 +1,7 @@
 use bevy::{prelude::*,
      asset::LoadState,
-     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}, ecs::event,};
+     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
+    };
 use bevy_tile_atlas::TileAtlasBuilder;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -23,7 +24,6 @@ const RIGHT_WALL_X : f32 = 450.0;
 
 //controls and visuals
 const ANIMATION_TIME : f32 = 0.1;
-const DOUBLE_TAP_DURATION : f32 = 0.2; //seconds
 
 const FIGHTERS : [Fighter;2]= [Fighter::IDF, Fighter::HAMAS];
 
