@@ -72,8 +72,6 @@ struct PlayerBundle{
     position: FighterPosition,
     velocity: FighterVelocity,
     movement_stack : FighterMovementStack,
-    movement_node_name : FighterMovementNodeName,
-    movement_duration: FighterMovementDuration,
     event_keytargetset_stack : KeyTargetSetStack,
     sprite: SpriteSheetBundle,
     controls: PlayerControls,
@@ -81,8 +79,8 @@ struct PlayerBundle{
 
 impl Default for PlayerBundle {
     fn default() -> Self {
-        let movement_stack = FighterMovementStack::new(10, 0.5);
-
+        let mut movement_stack = FighterMovementStack::new(10);
+        movement_stack.0.push(FighterMovement::InAir);
 
         Self{
             player: Player::Player1,
@@ -90,9 +88,7 @@ impl Default for PlayerBundle {
             health : FighterHealth(100.0),
             position : FighterPosition{x : 0.0, y :0.0},
             velocity : FighterVelocity{x : 0.0, y :0.0},
-            movement_stack : FighterMovementStack::new(10, 0.5),
-            movement_node_name : FighterMovementNodeName("InAir".to_string()),
-            movement_duration : FighterMovementDuration(0.0),
+            movement_stack : movement_stack,
             event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
@@ -292,14 +288,15 @@ fn player_control(mut query: Query<(&Fighter,
 
         let persistent_keytargetset = player_controls.into_persistent_keytargetset(&keyboard_input);
         let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
+        let full_keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         event_keytargetset_stack.0.update(time.delta_seconds());
         movement_stack.0.update(time.delta_seconds());
-
+        let last_durative_movement = movement_stack.0.stack.last().unwrap();
+            
         //if cant exist movement
-        let keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
-        if !fighter_map.name_map.get(&movement_node_name.0).unwrap()
-                .player_exit_condition(FLOOR_Y, position.y, movement_duration.0, &keytargetset) {
+        if !fighter_map.name_map.get(&last_durative_movement.0).unwrap()
+                .player_exit_condition(FLOOR_Y, position.y, last_durative_movement.1, &full_keytargetset) {
             continue;
         }
 
@@ -307,54 +304,52 @@ fn player_control(mut query: Query<(&Fighter,
         let joined_event_keytargetset = event_keytargetset_stack.join();
         //check for events
         if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
-            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0) {
+            if movement_node.movement == last_durative_movement.0 {continue};
+            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_stack, &event_keytargetset_stack) {
+                info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
+                movement_stack.0.push(movement_node.movement);
                 movement_node.enter(&mut position, &mut velocity);
-                movement_duration.0 = 0.0;
-                movement_node_name.0 = movement_node.name.clone();
-                info!("fighter {} changed movement to {}", fighter.to_string(), movement_node_name.0);
                 continue;
             }
         }
         // check for persistent movements
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
-            if movement_node.name == movement_node_name.0 {continue};
-            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_node_name.0) {
+            if movement_node.movement == last_durative_movement.0 {continue};
+            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_stack, &event_keytargetset_stack) {
+                info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
+                movement_stack.0.push(movement_node.movement);
                 movement_node.enter(&mut position, &mut velocity);
-                movement_duration.0 = 0.0;
-                movement_node_name.0 = movement_node.name.clone();
-                info!("fighter {} changed movement to {}", fighter.to_string(), movement_node_name.0);
                 continue;
             }
         }
-        if movement_node_name.0 != "Idle".to_string() {
-            let movement_node = fighter_map.name_map.get(&"Idle".to_string()).unwrap();
+
+        if last_durative_movement.0 != FighterMovement::Idle && full_keytargetset == KeyTargetSet::empty() {
+            let movement_node = fighter_map.name_map.get(&FighterMovement::Idle).unwrap();
+            info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
+            movement_stack.0.push(movement_node.movement);
             movement_node.enter(&mut position, &mut velocity);
-            movement_duration.0 = 0.0;
-            movement_node_name.0 = "Idle".to_string();
-            
-            info!("fighter {} changed movement to {}", fighter.to_string(), movement_node_name.0);
-            continue;
         }
     }
 }
 fn update_state(mut query: Query<(&Fighter,
                                     &mut FighterPosition,
                                     &mut FighterVelocity,
-                                    &FighterMovementNodeName,)>,
+                                    &FighterMovementStack,)>,
                                     time: Res<Time>,) {
     let dt = time.delta_seconds();
     
     for (fighter,
         mut position,
         mut velocity,
-        movement_node_index) in query.iter_mut() {
+        movement_stack) in query.iter_mut() {
 
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-        let movement_node = fighter_map.name_map.get(&movement_node_index.0).unwrap();
-        
-        movement_node.update(&mut position, &mut velocity, dt);
-        position.x = position.x.clamp(LEFT_WALL_X,RIGHT_WALL_X);
-        position.y = position.y.clamp(FLOOR_Y, CEILING_Y);
+        if let Some(last_durative_movement) = movement_stack.0.stack.last() {
+            let movement_node = fighter_map.name_map.get(&last_durative_movement.0).unwrap();
+            movement_node.update(&mut position, &mut velocity, dt);
+            position.x = position.x.clamp(LEFT_WALL_X,RIGHT_WALL_X);
+            position.y = position.y.clamp(FLOOR_Y, CEILING_Y);
+        }
     }
 }
 
@@ -362,7 +357,7 @@ fn draw_fighters(time: Res<Time>,
                 fighters_movement_animation_indicies: Res<FightersMovementAnimationIndicies>,
                 mut animation_timer: ResMut<AnimationTimer>,
                 mut query: Query<(&Fighter,
-                                &FighterMovementNodeName,
+                                &FighterMovementStack,
                                 &FighterPosition,
                                 &FighterVelocity,
                                 &mut TextureAtlasSprite,
@@ -370,31 +365,35 @@ fn draw_fighters(time: Res<Time>,
     
     animation_timer.tick(Duration::from_secs_f32(time.delta_seconds()));
     for (fighter,
-        movement_node_name,
+        movement_stack,
         position,
         velocity,
         mut sprite,
         mut transform) in query.iter_mut() {
 
-        let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap().name_map.get(&movement_node_name.0).unwrap();
-        let sprite_name = &movement_node.sprite_name;
-        
-        if animation_timer.just_finished() {
-            let movement_indicies = fighters_movement_animation_indicies.0.get(&fighter).unwrap()
-                                                                                .hashmap.get(sprite_name).unwrap();
-            if sprite.index < movement_indicies[0] || sprite.index > movement_indicies[1]-1 {
-                sprite.index = movement_indicies[0];
-            } else {
-                sprite.index += 1;
-            }
-        }
-        
-        transform.translation = Vec3::new(position.x, position.y, 0.0);
 
-        if velocity.x > 0.0 {
-            sprite.flip_x = false;
-        } else if velocity.x < 0.0 {
-            sprite.flip_x = true;
+        
+        if let Some(last_durative_movement) = movement_stack.0.stack.last() {
+            let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap().name_map.get(&last_durative_movement.0).unwrap();
+            let sprite_name = &movement_node.sprite_name;
+
+            if animation_timer.just_finished() {
+                let movement_indicies = fighters_movement_animation_indicies.0.get(&fighter).unwrap()
+                                                                                    .hashmap.get(sprite_name).unwrap();
+                if sprite.index < movement_indicies[0] || sprite.index > movement_indicies[1]-1 {
+                    sprite.index = movement_indicies[0];
+                } else {
+                    sprite.index += 1;
+                }
+            }
+            
+            transform.translation = Vec3::new(position.x, position.y, 0.0);
+    
+            if velocity.x > 0.0 {
+                sprite.flip_x = false;
+            } else if velocity.x < 0.0 {
+                sprite.flip_x = true;
+            }
         }
     }
 }

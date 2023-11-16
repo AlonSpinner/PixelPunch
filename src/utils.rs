@@ -1,13 +1,50 @@
-use bevy::prelude::*;
+pub struct TimeTaggedStack<T>
+where
+T: std::fmt::Debug, 
+{
+    pub stack : Vec<(T,f32)>,
+    pub max_size : usize,
+}
 
-#[derive(Component)]
-pub struct DurativeStack<T>{
+impl<T> TimeTaggedStack<T>
+where
+T : std::fmt::Debug, 
+{
+    pub fn new(max_size : usize) -> Self {
+        Self{
+            stack : Vec::with_capacity(max_size),
+            max_size,
+        }
+    }
+    
+    pub fn push(&mut self, value : T) {
+        if self.stack.len() == self.max_size {
+            self.stack.remove(0);
+        }
+        self.stack.push((value, 0.0));
+    }
+
+    pub fn update(&mut self, delta_time : f32) {
+        for (_, duration) in self.stack.iter_mut() {
+            *duration += delta_time;
+        }
+    }
+}
+
+
+pub struct DurativeStack<T>
+where
+T: std::fmt::Debug, 
+{
     pub stack : Vec<(T,f32)>,
     pub max_size : usize,
     pub max_duration : f32,
 }
 
-impl<T> DurativeStack<T>{
+impl<T> DurativeStack<T>
+where
+T : std::fmt::Debug, 
+{
     pub fn new(max_size : usize, max_duration : f32) -> Self {
         Self{
             stack : Vec::with_capacity(max_size),

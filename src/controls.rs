@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use std::collections::BTreeSet;
 use std::ops::Add;
+use std::fmt::Display;
+use std::fmt;
 use crate::utils::DurativeStack;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Ord, PartialOrd, Debug)]
@@ -21,6 +23,21 @@ pub enum KeyTarget{
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct KeyTargetSet(BTreeSet<KeyTarget>);
+
+impl Display for KeyTargetSet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut first = true;
+        for key in &self.0 {
+            if first {
+                first = false;
+            } else {
+                write!(f, ", ")?;
+            }
+            write!(f, "{:?}", key)?;
+        }
+        Ok(())
+    }
+}
 
 impl KeyTargetSet {
     pub fn empty() -> Self {

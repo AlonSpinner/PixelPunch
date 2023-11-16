@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use strum_macros::Display;
-use crate::utils::DurativeStack;
+use crate::controls::KeyTargetSetStack;
+use crate::utils::TimeTaggedStack;
 
 use super::controls::{KeyTargetSet,KeyTarget};
 use std::collections::HashMap;
@@ -72,38 +73,45 @@ impl FighterMovement {
 }
 
 #[derive(Component)]
-pub struct FighterMovementStack(pub DurativeStack<FighterMovement>);
+pub struct FighterMovementStack(pub TimeTaggedStack<FighterMovement>);
 impl FighterMovementStack {
-    pub fn new(max_size : usize, max_duration : f32) -> Self {
-        Self(DurativeStack::new(max_size, max_duration))
+    pub fn new(max_size : usize) -> Self {
+        Self(TimeTaggedStack::new(max_size))
     }
 }
 pub struct HitBox;
 
 pub struct FighterMovementNode {
     pub movement: FighterMovement,
-    pub player_enter_condition : fn(floor_y : f32,
+    player_enter_condition : fn(floor_y : f32,
                                     position_y : f32,
-                                    previous_node_name : &String,) -> bool,
-    pub player_exit_condition : fn(floor_y : f32,
+                                    fighter_movement_stack : &FighterMovementStack,
+                                    keyset : &KeyTargetSetStack) -> bool,
+    player_exit_condition : fn(floor_y : f32,
                                     position_y : f32,
                                     movement_duration : f32,
                                     keyset : &KeyTargetSet) -> bool,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
-    pub update : fn(fighter_position : &mut FighterPosition,
+    update : fn(fighter_position : &mut FighterPosition,
                     fighter_velocity : &mut FighterVelocity,
                     delta_time : f32),
-    pub enter : fn(fighter_position : &mut FighterPosition,
+    enter : fn(fighter_position : &mut FighterPosition,
                    fighter_velocity : &mut FighterVelocity),
     pub sprite_name : String,
 }
 
 impl FighterMovementNode {
-    pub fn player_enter_condition(&self, floor_y : f32,  position_y : f32, previous_node_name : &String) -> bool {
-        (self.player_enter_condition)(floor_y, position_y, previous_node_name)
+    pub fn player_enter_condition(&self, floor_y : f32,
+                                        position_y : f32,
+                                        fighter_movement_stack : &FighterMovementStack,
+                                        keyset_stack :&KeyTargetSetStack) -> bool {
+        (self.player_enter_condition)(floor_y, position_y, fighter_movement_stack,keyset_stack)
     }
-    pub fn player_exit_condition(&self, floor_y :f32,  position_y : f32, movement_duration : f32, keyset : &KeyTargetSet) -> bool {
+    pub fn player_exit_condition(&self, floor_y :f32,
+                                        position_y : f32,
+                                        movement_duration : f32,
+                                        keyset : &KeyTargetSet) -> bool {
         (self.player_exit_condition)(floor_y, position_y, movement_duration, keyset)
     }
     pub fn update(&self, fighter_position : &mut FighterPosition,
@@ -126,7 +134,7 @@ impl Default for FighterMovementNode {
                 fighter_velocity.y = 0.0;
             },
             update: |_,_,_| {},
-            player_enter_condition: |floor_y,position_y,_| position_y == floor_y,
+            player_enter_condition: |floor_y,position_y,_,_| position_y == floor_y,
             player_exit_condition: |floor_y,position_y,_,_| position_y == floor_y,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
@@ -209,8 +217,18 @@ impl Default for FighterMovementMap {
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
         FighterMovementNode{
             movement: FighterMovement::WalkingRight,
-            player_exit_condition: |floor_y, position_y, movement_duration,_| 
-                position_y == floor_y && movement_duration > 0.1,
+            player_enter_condition: |floor_y, position_y, fighter_movement_stack,_| {
+                let cond1 = position_y == floor_y;
+                let mut cond2 = true;
+                if let Some(last_movement) =fighter_movement_stack.0.stack.last() {
+                    if last_movement.0 == FighterMovement::RunningRight && last_movement.1 < 0.1 {
+                        cond2 = false;
+                    }
+                }
+                cond1 & cond2
+            },
+            player_exit_condition: |floor_y, position_y, _,_| 
+                position_y == floor_y,
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = WALKING_SPEED;
             },
@@ -224,9 +242,24 @@ impl Default for FighterMovementMap {
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
         FighterMovementNode{
             movement: FighterMovement::RunningRight,
-            player_enter_condition: |floor_y,position_y, previous_node_name| 
-                position_y == floor_y && 
-                previous_node_name == "WalkingRight",
+            player_enter_condition: |floor_y,position_y,
+                                     _,
+                                     keyset_stack| {
+                let window_time = 0.3;
+                let cond1 = position_y == floor_y;
+
+                //search for double pressed in windo
+                let mut pressed = 0;
+                for timed_keyset in keyset_stack.0.stack.iter().rev() {
+                    if timed_keyset.1 > window_time {break};
+                    if timed_keyset.0.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])) {
+                        pressed += 1;
+                    }
+                }
+                let cond2 = pressed > 1;
+
+                cond1 & cond2
+            },
             player_exit_condition: |_, _, _, keyset| {keyset != &KeyTargetSet::empty()},
             enter: |_, fighter_velocity| {fighter_velocity.x = RUNNING_SPEED;},
             update: |fighter_position, fighter_velocity, delta_time| {
