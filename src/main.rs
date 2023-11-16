@@ -11,6 +11,8 @@ pub mod fighters;
 use fighters::*;
 pub mod controls;
 use controls::*;
+pub mod utils;
+use utils::*;
 
 //scene
 
@@ -69,6 +71,7 @@ struct PlayerBundle{
     health: FighterHealth,
     position: FighterPosition,
     velocity: FighterVelocity,
+    movement_stack : FighterMovementStack,
     movement_node_name : FighterMovementNodeName,
     movement_duration: FighterMovementDuration,
     event_keytargetset_stack : KeyTargetSetStack,
@@ -78,12 +81,16 @@ struct PlayerBundle{
 
 impl Default for PlayerBundle {
     fn default() -> Self {
+        let movement_stack = FighterMovementStack::new(10, 0.5);
+
+
         Self{
             player: Player::Player1,
             fighter: Fighter::IDF,
             health : FighterHealth(100.0),
             position : FighterPosition{x : 0.0, y :0.0},
             velocity : FighterVelocity{x : 0.0, y :0.0},
+            movement_stack : FighterMovementStack::new(10, 0.5),
             movement_node_name : FighterMovementNodeName("InAir".to_string()),
             movement_duration : FighterMovementDuration(0.0),
             event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
@@ -268,8 +275,7 @@ fn setup_game(
 fn player_control(mut query: Query<(&Fighter,
                                     &PlayerControls,
                                     &mut KeyTargetSetStack,
-                                    &mut FighterMovementDuration,
-                                    &mut FighterMovementNodeName,
+                                    &mut FighterMovementStack,
                                     &mut FighterPosition,
                                     &mut FighterVelocity)>,
                                     keyboard_input_resource: Res<Input<KeyCode>>,
@@ -280,25 +286,24 @@ fn player_control(mut query: Query<(&Fighter,
     for (fighter,
         player_controls,
         mut event_keytargetset_stack,
-        mut movement_duration,
-        mut movement_node_name,
+        mut movement_stack,
         mut position,
         mut velocity) in query.iter_mut() {
 
         let persistent_keytargetset = player_controls.into_persistent_keytargetset(&keyboard_input);
         let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-        event_keytargetset_stack.update(time.delta_seconds());
+        event_keytargetset_stack.0.update(time.delta_seconds());
+        movement_stack.0.update(time.delta_seconds());
 
         //if cant exist movement
         let keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
         if !fighter_map.name_map.get(&movement_node_name.0).unwrap()
                 .player_exit_condition(FLOOR_Y, position.y, movement_duration.0, &keytargetset) {
-            movement_duration.0 += time.delta_seconds();
             continue;
         }
 
-        event_keytargetset_stack.push(event_keytargetset);
+        event_keytargetset_stack.0.push(event_keytargetset);
         let joined_event_keytargetset = event_keytargetset_stack.join();
         //check for events
         if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {

@@ -1,11 +1,10 @@
 use bevy::prelude::*;
 use strum_macros::Display;
-use crate::controls::KeyTargetSetStack;
+use crate::utils::DurativeStack;
 
 use super::controls::{KeyTargetSet,KeyTarget};
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::ops::Add;
 use lazy_static::lazy_static;
 use std::sync::Arc;
 
@@ -49,13 +48,15 @@ pub struct FighterMovementDuration(pub f32);
 #[derive(Component)]
 pub struct FighterMovementNodeName(pub String);
 
-#[derive(Clone, Copy, Debug, Display, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Display, PartialEq, Eq, Hash)]
 pub enum FighterMovement {
     Slashing,
     Jumping,
-    Running,
+    RunningRight,
+    RunningLeft,
     Idle,
-    Walking,
+    WalkingRight,
+    WalkingLeft,
     Docking,
     InAir,
 }
@@ -70,10 +71,16 @@ impl FighterMovement {
 
 }
 
+#[derive(Component)]
+pub struct FighterMovementStack(pub DurativeStack<FighterMovement>);
+impl FighterMovementStack {
+    pub fn new(max_size : usize, max_duration : f32) -> Self {
+        Self(DurativeStack::new(max_size, max_duration))
+    }
+}
 pub struct HitBox;
 
 pub struct FighterMovementNode {
-    pub name : String,
     pub movement: FighterMovement,
     pub player_enter_condition : fn(floor_y : f32,
                                     position_y : f32,
@@ -113,7 +120,6 @@ impl FighterMovementNode {
 impl Default for FighterMovementNode {
     fn default() -> Self {
         Self{
-            name : "Idle".to_string(),
             movement: FighterMovement::Idle,
             enter: |_fighter_position, fighter_velocity| {
                 fighter_velocity.x = 0.0;
@@ -133,7 +139,7 @@ impl Default for FighterMovementNode {
 pub struct FighterMovementMap {
     pub event_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
     pub persistent_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
-    pub name_map : HashMap<String, Arc<FighterMovementNode>>,
+    pub name_map : HashMap<FighterMovement, Arc<FighterMovementNode>>,
 }
 
 impl FighterMovementMap {
@@ -146,14 +152,9 @@ impl FighterMovementMap {
     }
 
     fn ensure_must_exists_movements(self) -> Self{
-        let must_exist_movements = ["Idle",
-                                                "WalkingRight",
-                                                "WalkingLeft",
-                                                "Docking",
-                                                "InAir"];
-        
+        let must_exist_movements = [FighterMovement::Idle];
         for movement in must_exist_movements.iter() {
-            if !self.name_map.contains_key(*movement) {
+            if !self.name_map.contains_key(movement) {
                 panic!("Movement {} must exist in the FighterMovementMap", movement);
             }
         }
@@ -166,15 +167,15 @@ impl FighterMovementMap {
         } else if self.persistent_map.contains_key(keyset) {
             panic!("Keyset {:?} already contained in the persistent_map", keyset);
         } else if {
-            self.name_map.contains_key(&node.name)
+            self.name_map.contains_key(&node.movement)
         } {
-            panic!("Node with name {} already contained in the name_map", node.name);
+            panic!("Node with fighter movment {} already contained in the name_map", node.movement);
         }
     }
 
     pub fn insert_to_event_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
         self.check_if_can_insert_node(&keyset, &node);
-        let node_name = node.name.clone();
+        let node_name = node.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.name_map.insert(node_name, arc_movement_node.clone());
         self.event_map.insert(keyset, arc_movement_node);
@@ -182,7 +183,7 @@ impl FighterMovementMap {
 
     pub fn insert_to_peristent_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
         self.check_if_can_insert_node(&keyset, &node);
-        let node_name = node.name.clone();
+        let node_name = node.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.name_map.insert(node_name, arc_movement_node.clone());
         self.persistent_map.insert(keyset, arc_movement_node);
@@ -190,10 +191,10 @@ impl FighterMovementMap {
 
     //by_name map may contain nodes that are not in the keyset_map
     pub fn insert_to_name_map(&mut self, node : FighterMovementNode) {
-        if self.name_map.contains_key(&node.name) {
-            panic!("node with that name {} already exists in the map", &node.name);
+        if self.name_map.contains_key(&node.movement) {
+            panic!("node with that name {} already exists in the map", &node.movement);
         } else {
-        let node_name = node.name.clone();
+        let node_name = node.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.name_map.insert(node_name, arc_movement_node.clone());
         }
@@ -207,8 +208,7 @@ impl Default for FighterMovementMap {
                     
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
         FighterMovementNode{
-            name : "WalkingRight".to_string(),
-            movement: FighterMovement::Walking,
+            movement: FighterMovement::WalkingRight,
             player_exit_condition: |floor_y, position_y, movement_duration,_| 
                 position_y == floor_y && movement_duration > 0.1,
             enter: |_, fighter_velocity| {
@@ -223,17 +223,12 @@ impl Default for FighterMovementMap {
 
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
         FighterMovementNode{
-            name : "RunningRight".to_string(),
-            movement: FighterMovement::Running,
+            movement: FighterMovement::RunningRight,
             player_enter_condition: |floor_y,position_y, previous_node_name| 
                 position_y == floor_y && 
                 previous_node_name == "WalkingRight",
-            player_exit_condition: |floor_y, position_y, movement_duration, keyset| {
-                keyset != &KeyTargetSet::empty()
-            },
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = RUNNING_SPEED;
-            },
+            player_exit_condition: |_, _, _, keyset| {keyset != &KeyTargetSet::empty()},
+            enter: |_, fighter_velocity| {fighter_velocity.x = RUNNING_SPEED;},
             update: |fighter_position, fighter_velocity, delta_time| {
                 fighter_position.x += fighter_velocity.x * delta_time
             },
@@ -243,8 +238,7 @@ impl Default for FighterMovementMap {
 
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Left]),
         FighterMovementNode{
-            name : "WalkingLeft".to_string(),
-            movement: FighterMovement::Walking,
+            movement: FighterMovement::WalkingLeft,
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = -WALKING_SPEED;
             },
@@ -257,7 +251,6 @@ impl Default for FighterMovementMap {
 
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
         FighterMovementNode{
-            name : "Docking".to_string(),
             movement: FighterMovement::Docking,
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = 0.0;
@@ -269,7 +262,6 @@ impl Default for FighterMovementMap {
 
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::UpJustPressed]),
         FighterMovementNode{
-            name : "Jump".to_string(),
             movement: FighterMovement::Jumping,
             enter: |_, fighter_velocity| {
                 fighter_velocity.y = JUMPING_SPEED;
@@ -285,7 +277,6 @@ impl Default for FighterMovementMap {
 
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed, KeyTarget::DefendJustPressed]),
         FighterMovementNode{
-            name : "Slashing".to_string(),
             movement: FighterMovement::Slashing,
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = 0.0;
@@ -299,7 +290,6 @@ impl Default for FighterMovementMap {
 
         map.insert_to_name_map(
         FighterMovementNode{
-            name : "InAir".to_string(),
             movement: FighterMovement::InAir,
             update: |fighter_position, fighter_velocity, delta_time| {
                 fighter_position.x += fighter_velocity.x * delta_time;
