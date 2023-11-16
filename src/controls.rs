@@ -90,8 +90,8 @@ impl KeyTargetSetStack{
 
     pub fn join(&self) -> KeyTargetSet {
         let mut joined = KeyTargetSet::empty();
-        for (keytargetset, _) in self.0.stack.iter() {
-            joined = joined + keytargetset.clone();
+        for time_tagged_keytargetset in self.0.stack.iter() {
+            joined = joined + time_tagged_keytargetset.value.clone();
         }
         joined
     }

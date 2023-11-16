@@ -295,8 +295,8 @@ fn player_control(mut query: Query<(&Fighter,
         let last_durative_movement = movement_stack.0.stack.last().unwrap();
             
         //if cant exist movement
-        if !fighter_map.name_map.get(&last_durative_movement.0).unwrap()
-                .player_exit_condition(FLOOR_Y, position.y, last_durative_movement.1, &full_keytargetset) {
+        if !fighter_map.name_map.get(&last_durative_movement.value).unwrap()
+                .player_exit_condition(FLOOR_Y, position.y, last_durative_movement.duration, &full_keytargetset) {
             continue;
         }
 
@@ -304,7 +304,7 @@ fn player_control(mut query: Query<(&Fighter,
         let joined_event_keytargetset = event_keytargetset_stack.join();
         //check for events
         if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
-            if movement_node.movement == last_durative_movement.0 {continue};
+            if movement_node.movement == last_durative_movement.value {continue};
             if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_stack, &event_keytargetset_stack) {
                 info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
                 movement_stack.0.push(movement_node.movement);
@@ -314,7 +314,7 @@ fn player_control(mut query: Query<(&Fighter,
         }
         // check for persistent movements
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
-            if movement_node.movement == last_durative_movement.0 {continue};
+            if movement_node.movement == last_durative_movement.value {continue};
             if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_stack, &event_keytargetset_stack) {
                 info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
                 movement_stack.0.push(movement_node.movement);
@@ -323,7 +323,7 @@ fn player_control(mut query: Query<(&Fighter,
             }
         }
 
-        if last_durative_movement.0 != FighterMovement::Idle && full_keytargetset == KeyTargetSet::empty() {
+        if last_durative_movement.value != FighterMovement::Idle && full_keytargetset == KeyTargetSet::empty() {
             let movement_node = fighter_map.name_map.get(&FighterMovement::Idle).unwrap();
             info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
             movement_stack.0.push(movement_node.movement);
@@ -345,7 +345,7 @@ fn update_state(mut query: Query<(&Fighter,
 
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         if let Some(last_durative_movement) = movement_stack.0.stack.last() {
-            let movement_node = fighter_map.name_map.get(&last_durative_movement.0).unwrap();
+            let movement_node = fighter_map.name_map.get(&last_durative_movement.value).unwrap();
             movement_node.update(&mut position, &mut velocity, dt);
             position.x = position.x.clamp(LEFT_WALL_X,RIGHT_WALL_X);
             position.y = position.y.clamp(FLOOR_Y, CEILING_Y);
@@ -370,11 +370,10 @@ fn draw_fighters(time: Res<Time>,
         velocity,
         mut sprite,
         mut transform) in query.iter_mut() {
-
-
         
         if let Some(last_durative_movement) = movement_stack.0.stack.last() {
-            let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap().name_map.get(&last_durative_movement.0).unwrap();
+            let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap()
+                                                                .name_map.get(&last_durative_movement.value).unwrap();
             let sprite_name = &movement_node.sprite_name;
 
             if animation_timer.just_finished() {

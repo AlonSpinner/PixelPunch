@@ -217,18 +217,6 @@ impl Default for FighterMovementMap {
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
         FighterMovementNode{
             movement: FighterMovement::WalkingRight,
-            player_enter_condition: |floor_y, position_y, fighter_movement_stack,_| {
-                let cond1 = position_y == floor_y;
-                let mut cond2 = true;
-                if let Some(last_movement) =fighter_movement_stack.0.stack.last() {
-                    if last_movement.0 == FighterMovement::RunningRight && last_movement.1 < 0.1 {
-                        cond2 = false;
-                    }
-                }
-                cond1 & cond2
-            },
-            player_exit_condition: |floor_y, position_y, _,_| 
-                position_y == floor_y,
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = WALKING_SPEED;
             },
@@ -251,8 +239,8 @@ impl Default for FighterMovementMap {
                 //search for double pressed in window
                 let mut pressed = 0;
                 for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
-                    if timed_keyset.1 > window_time {break};
-                    if timed_keyset.0.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])) {
+                    if timed_keyset.duration > window_time {break};
+                    if timed_keyset.value.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])) {
                         pressed += 1;
                     }
                 }
@@ -261,7 +249,7 @@ impl Default for FighterMovementMap {
                 //make sure window is only filled with idle/walking right
                 let mut cond3 = true;
                 if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
-                    if last_movement.0 != FighterMovement::Idle && last_movement.0 != FighterMovement::WalkingRight {
+                    if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingRight {
                         cond3 = false;
                     }
                 }
@@ -287,6 +275,44 @@ impl Default for FighterMovementMap {
                 fighter_position.x += fighter_velocity.x * delta_time;
             },
             sprite_name: "Walking".to_string(),
+            ..default()}
+        );
+
+        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::LeftJustPressed]),
+        FighterMovementNode{
+            movement: FighterMovement::RunningLeft,
+            player_enter_condition: |floor_y,position_y,
+                                     fighter_movement_stack,
+                                     event_keyset_stack| {
+                let window_time = 0.3;
+                let cond1 = position_y == floor_y;
+
+                //search for double pressed in window
+                let mut pressed = 0;
+                for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
+                    if timed_keyset.duration > window_time {break};
+                    if timed_keyset.value.is_superset(&KeyTargetSet::from([KeyTarget::LeftJustPressed])) {
+                        pressed += 1;
+                    }
+                }
+                let cond2 = pressed > 1;
+
+                //make sure window is only filled with idle/walking right
+                let mut cond3 = true;
+                if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
+                    if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingLeft {
+                        cond3 = false;
+                    }
+                }
+
+                cond1 & cond2 & cond3
+            },
+            player_exit_condition: |_, _, _, keyset| {keyset != &KeyTargetSet::empty()},
+            enter: |_, fighter_velocity| {fighter_velocity.x = -RUNNING_SPEED;},
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.x += fighter_velocity.x * delta_time
+            },
+            sprite_name: "Running".to_string(),
             ..default()}
         );
 

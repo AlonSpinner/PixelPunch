@@ -1,13 +1,13 @@
 pub struct TimeTaggedValue<T> {
-    value : T,
-    duration : f32,
+    pub value : T,
+    pub duration : f32,
 }
 
 pub struct TimeTaggedStack<T>
 where
 T: std::fmt::Debug, 
 {
-    pub stack : Vec<(T,f32)>,
+    pub stack : Vec<TimeTaggedValue<T>>,
     pub max_size : usize,
 }
 
@@ -26,12 +26,12 @@ T : std::fmt::Debug,
         if self.stack.len() == self.max_size {
             self.stack.remove(0);
         }
-        self.stack.push((value, 0.0));
+        self.stack.push(TimeTaggedValue{value : value, duration : 0.0});
     }
 
     pub fn update(&mut self, delta_time : f32) {
-        for (_, duration) in self.stack.iter_mut() {
-            *duration += delta_time;
+        for time_tagged_value in self.stack.iter_mut() {
+            time_tagged_value.duration += delta_time;
         }
     }
 }
@@ -41,7 +41,7 @@ pub struct DurativeStack<T>
 where
 T: std::fmt::Debug, 
 {
-    pub stack : Vec<(T,f32)>,
+    pub stack : Vec<TimeTaggedValue<T>>,
     pub max_size : usize,
     pub max_duration : f32,
 }
@@ -62,14 +62,14 @@ T : std::fmt::Debug,
         if self.stack.len() == self.max_size {
             self.stack.remove(0);
         }
-        self.stack.push((value, 0.0));
+        self.stack.push(TimeTaggedValue { value: value, duration: 0.0 });
     }
 
     pub fn update(&mut self, delta_time : f32) {
         let mut keep_values = 0;
-        for (_, duration) in self.stack.iter_mut().rev() {
-            *duration += delta_time;
-            if *duration > self.max_duration {
+        for time_tagged_value in self.stack.iter_mut().rev() {
+            time_tagged_value.duration += delta_time;
+            if time_tagged_value.duration > self.max_duration {
                 break
         } else {
             keep_values += 1;
