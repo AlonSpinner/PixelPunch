@@ -257,13 +257,13 @@ fn setup_game(
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
         sprite: TextureAtlasSprite{flip_x : true, ..default()},
         ..default()};
-    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
-                                        player : player,
-                                        fighter : fighter,
-                                        position : FighterPosition{x : EAST_WALL_X - 200.0, y :0.0, z : CEILING_Z},
-                                        velocity : FighterVelocity{x : 0.0, y : 0.0, z : -JUMPING_SPEED},
-                                        controls: player2_controls,
-                                        ..default()});
+    // commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
+    //                                     player : player,
+    //                                     fighter : fighter,
+    //                                     position : FighterPosition{x : EAST_WALL_X - 200.0, y :0.0, z : CEILING_Z},
+    //                                     velocity : FighterVelocity{x : 0.0, y : 0.0, z : -JUMPING_SPEED},
+    //                                     controls: player2_controls,
+    //                                     ..default()});
     
     //insert resources
     commands.insert_resource(AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating)));
@@ -297,20 +297,24 @@ fn player_control(mut query: Query<(&Fighter,
         movement_stack.0.update(time.delta_seconds());
         let last_durative_movement = movement_stack.0.stack.last().unwrap();
         let last_movement_node = fighter_map.name_map.get(&last_durative_movement.value).unwrap();
-            
+
+        // info!("{}",last_movement_node.movement.to_string());
         //if cant exist movement
         if !last_movement_node.player_exit_condition(FLOOR_Z, position.z, last_durative_movement.duration, &full_keytargetset) {
             //check for channels
             if let Some(channel_function) = last_movement_node.channel{
                 channel_function(&full_keytargetset, &mut velocity);
             }
+            // info!("did not exit");
             continue;
         }
+        info!("exited");
 
         event_keytargetset_stack.0.push(event_keytargetset);
         let joined_event_keytargetset = event_keytargetset_stack.join();
         //check for events
         if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
+            info!("trying to get into event node {}",&movement_node.movement);
             if movement_node.movement == last_durative_movement.value {continue};
             if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, &event_keytargetset_stack) {
                 info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
@@ -331,9 +335,9 @@ fn player_control(mut query: Query<(&Fighter,
             }
         }
 
-        if last_durative_movement.value != FighterMovement::Idle && full_keytargetset == KeyTargetSet::empty() {
+        if last_durative_movement.value != FighterMovement::Idle {
             let movement_node = fighter_map.name_map.get(&FighterMovement::Idle).unwrap();
-            info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
+            info!("fighter {} entered movement Idle for lack of action", &fighter);
             movement_stack.0.push(movement_node.movement);
             movement_node.enter(&mut position, &mut velocity);
         }

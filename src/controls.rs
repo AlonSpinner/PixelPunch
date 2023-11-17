@@ -53,6 +53,10 @@ impl KeyTargetSet {
     pub fn is_superset(&self, other: &Self) -> bool {
         self.0.is_superset(&other.0)
     }
+
+    pub fn overlaps(&self, other: &Self) -> bool {
+        !self.0.is_disjoint(&other.0)
+    }
 }
 
 impl<const N: usize> From<[KeyTarget; N]> for KeyTargetSet {
@@ -143,7 +147,7 @@ impl PlayerControls {
         if keyboard_input.pressed(self.attack) {
             pressed_keys = pressed_keys + KeyTarget::Attack;
         }
-        if keyboard_input.pressed(self.attack) {
+        if keyboard_input.pressed(self.jump) {
             pressed_keys = pressed_keys + KeyTarget::Jump;
         }
         if keyboard_input.pressed(self.defend) {

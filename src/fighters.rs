@@ -12,8 +12,8 @@ use std::sync::Arc;
 //movement
 pub const WALKING_SPEED : f32 = 100.0;
 pub const RUNNING_SPEED : f32 = 200.0;
-pub const JUMPING_SPEED : f32 = 100.0;
-pub const GRAVITY : f32 = -100.0;
+pub const JUMPING_SPEED : f32 = 200.0;
+pub const GRAVITY : f32 = -400.0;
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, Display)]
 pub enum Fighter{
@@ -63,13 +63,12 @@ pub enum FighterMovement {
     Idle,
     Slashing,
     Jumping,
-    RunningRight,
-    RunningNorthEast,
-    RunningLeft,
-    WalkingRight,
-    WalkingLeft,
-    WalkingUp,
-    WalkingDown,
+    RunningEast,
+    RunningWest,
+    WalkingEast,
+    WalkingWest,
+    WalkingNorth,
+    WalkingSouth,
     WalkingNorthEast,
     WalkingNorthWest,
     WalkingSouthEast,
@@ -224,7 +223,7 @@ impl Default for FighterMovementMap {
                     
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
         FighterMovementNode{
-            movement: FighterMovement::WalkingRight,
+            movement: FighterMovement::WalkingEast,
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = WALKING_SPEED;
             },
@@ -237,7 +236,7 @@ impl Default for FighterMovementMap {
 
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
         FighterMovementNode{
-            movement: FighterMovement::RunningRight,
+            movement: FighterMovement::RunningEast,
             player_enter_condition: |floor_z,position_z,
                                      fighter_movement_stack,
                                      event_keyset_stack| {
@@ -257,7 +256,7 @@ impl Default for FighterMovementMap {
                 //make sure window is only filled with idle/walking right
                 let mut cond3 = true;
                 if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
-                    if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingRight {
+                    if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingEast {
                         cond3 = false;
                     }
                 }
@@ -265,9 +264,23 @@ impl Default for FighterMovementMap {
                 cond1 & cond2 & cond3
             },
             player_exit_condition: |_, _, _, keyset| {
-                if keyset == &KeyTargetSet::empty() {return false};
-                if KeyTargetSet::from([KeyTarget::Up]).is_subset(keyset) ||
-                    KeyTargetSet::from([KeyTarget::Down]).is_subset(keyset) {return false};
+                info!("{}",keyset);
+                if keyset == &KeyTargetSet::empty() {
+                    return false
+                };
+
+                if keyset.overlaps(&KeyTargetSet::from([KeyTarget::JumpJustPressed,
+                                                        KeyTarget::AttackJustPressed,
+                                                        KeyTarget::DefendJustPressed])) {
+                    info!("returned true");
+                    return true
+                };
+
+                if keyset.overlaps(&KeyTargetSet::from([KeyTarget::Up,
+                                                        KeyTarget::Down,
+                                                        KeyTarget::Right])) {
+                return false
+                };
                 true
             },
             enter: |_, fighter_velocity| {fighter_velocity.x = RUNNING_SPEED;},
@@ -277,10 +290,10 @@ impl Default for FighterMovementMap {
             },
             channel: Some(|full_keyset, fighter_velocity| {
                 if KeyTargetSet::from([KeyTarget::Up]).is_subset(full_keyset) {
-                    fighter_velocity.y = WALKING_SPEED/2.0;
+                    fighter_velocity.y = WALKING_SPEED;
                 }
                 if KeyTargetSet::from([KeyTarget::Down]).is_subset(full_keyset) {
-                    fighter_velocity.y = -WALKING_SPEED/2.0;
+                    fighter_velocity.y = -WALKING_SPEED;
                 }
             }),
             sprite_name: "Running".to_string(),
@@ -289,7 +302,7 @@ impl Default for FighterMovementMap {
 
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Left]),
         FighterMovementNode{
-            movement: FighterMovement::WalkingLeft,
+            movement: FighterMovement::WalkingWest,
             enter: |_, fighter_velocity| {
                 fighter_velocity.x = -WALKING_SPEED;
             },
@@ -302,7 +315,7 @@ impl Default for FighterMovementMap {
 
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up]),
         FighterMovementNode{
-            movement: FighterMovement::WalkingUp,
+            movement: FighterMovement::WalkingNorth,
             enter: |_, fighter_velocity| {
                 fighter_velocity.y = WALKING_SPEED;
             },
@@ -315,7 +328,7 @@ impl Default for FighterMovementMap {
 
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
         FighterMovementNode{
-            movement: FighterMovement::WalkingDown,
+            movement: FighterMovement::WalkingSouth,
             enter: |_, fighter_velocity| {
                 fighter_velocity.y = -WALKING_SPEED;
             },
@@ -388,7 +401,7 @@ impl Default for FighterMovementMap {
 
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::LeftJustPressed]),
         FighterMovementNode{
-            movement: FighterMovement::RunningLeft,
+            movement: FighterMovement::RunningWest,
             player_enter_condition: |floor_z,position_z,
                                      fighter_movement_stack,
                                      event_keyset_stack| {
@@ -408,7 +421,7 @@ impl Default for FighterMovementMap {
                 //make sure window is only filled with idle/walking right
                 let mut cond3 = true;
                 if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
-                    if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingLeft {
+                    if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingWest {
                         cond3 = false;
                     }
                 }
@@ -416,14 +429,22 @@ impl Default for FighterMovementMap {
                 cond1 & cond2 & cond3
             },
             player_exit_condition: |_, _, _, keyset| {
-                if keyset == &KeyTargetSet::empty() {return false};
-                
-                if KeyTargetSet::from([KeyTarget::Jump]).is_subset(keyset) ||
-                KeyTargetSet::from([KeyTarget::Attack]).is_subset(keyset) ||
-                KeyTargetSet::from([KeyTarget::Defend]).is_subset(keyset) {return true};
-                
-                if KeyTargetSet::from([KeyTarget::Up]).is_subset(keyset) ||
-                    KeyTargetSet::from([KeyTarget::Down]).is_subset(keyset) {return false};
+                info!("{}",keyset);
+                if keyset == &KeyTargetSet::empty() {
+                    return false
+                };
+
+                if keyset.overlaps(&KeyTargetSet::from([KeyTarget::JumpJustPressed,
+                                                        KeyTarget::AttackJustPressed,
+                                                        KeyTarget::DefendJustPressed])) {
+                    return true
+                };
+
+                if keyset.overlaps(&KeyTargetSet::from([KeyTarget::Up,
+                                                        KeyTarget::Down,
+                                                        KeyTarget::Right])) {
+                return false
+                };
                 true
             },
             enter: |_, fighter_velocity| {fighter_velocity.x = -RUNNING_SPEED;},
