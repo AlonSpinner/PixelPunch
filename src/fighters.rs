@@ -34,13 +34,22 @@ pub static ref FIGHTERS_MOVEMENT_GRAPH : HashMap<Fighter, FighterMovementMap> = 
 pub struct FighterHealth(pub f32);
 #[derive(Component)]
 pub struct FighterPosition {
-    pub x : f32,
-    pub y : f32,
+    pub x : f32, //right
+    pub y : f32, //in
+    pub z : f32, //up
 }
+
+impl From<&FighterPosition> for [f32;3]{
+    fn from(xyz : &FighterPosition) -> [f32;3] {
+        [xyz.x,xyz.y,xyz.z]
+    }
+}
+
 #[derive(Component)]
 pub struct FighterVelocity {
     pub x : f32,
     pub y : f32,
+    pub z :f32,
 }
 
 #[derive(Component)]
@@ -51,25 +60,21 @@ pub struct FighterMovementNodeName(pub String);
 
 #[derive(Clone, Copy, Debug, Display, PartialEq, Eq, Hash)]
 pub enum FighterMovement {
+    Idle,
     Slashing,
     Jumping,
     RunningRight,
     RunningLeft,
-    Idle,
     WalkingRight,
     WalkingLeft,
+    WalkingUp,
+    WalkingDown,
+    WalkingNorthEast,
+    WalkingNorthWest,
+    WalkingSouthEast,
+    WalkingSouthWest,
     Docking,
     InAir,
-}
-
-impl FighterMovement {
-    //don't change to the same movement
-    pub fn change_to(&mut self, new_movement: Self) {
-        if &new_movement != self {
-            *self = new_movement;
-        }
-    }
-
 }
 
 #[derive(Component)]
@@ -83,12 +88,12 @@ pub struct HitBox;
 
 pub struct FighterMovementNode {
     pub movement: FighterMovement,
-    player_enter_condition : fn(floor_y : f32,
-                                    position_y : f32,
+    player_enter_condition : fn(floor_z : f32,
+                                    position_z : f32,
                                     fighter_movement_stack : &FighterMovementStack,
                                     keyset : &KeyTargetSetStack) -> bool,
-    player_exit_condition : fn(floor_y : f32,
-                                    position_y : f32,
+    player_exit_condition : fn(floor_z : f32,
+                                    position_z : f32,
                                     movement_duration : f32,
                                     keyset : &KeyTargetSet) -> bool,
     pub hit_boxes : Vec<HitBox>,
@@ -102,17 +107,17 @@ pub struct FighterMovementNode {
 }
 
 impl FighterMovementNode {
-    pub fn player_enter_condition(&self, floor_y : f32,
-                                        position_y : f32,
+    pub fn player_enter_condition(&self, floor_z : f32,
+                                        position_z : f32,
                                         fighter_movement_stack : &FighterMovementStack,
                                         keyset_stack :&KeyTargetSetStack) -> bool {
-        (self.player_enter_condition)(floor_y, position_y, fighter_movement_stack,keyset_stack)
+        (self.player_enter_condition)(floor_z, position_z, fighter_movement_stack,keyset_stack)
     }
-    pub fn player_exit_condition(&self, floor_y :f32,
-                                        position_y : f32,
+    pub fn player_exit_condition(&self, floor_z :f32,
+                                        position_z : f32,
                                         movement_duration : f32,
                                         keyset : &KeyTargetSet) -> bool {
-        (self.player_exit_condition)(floor_y, position_y, movement_duration, keyset)
+        (self.player_exit_condition)(floor_z, position_z, movement_duration, keyset)
     }
     pub fn update(&self, fighter_position : &mut FighterPosition,
                          fighter_velocity : &mut FighterVelocity,
@@ -134,8 +139,8 @@ impl Default for FighterMovementNode {
                 fighter_velocity.y = 0.0;
             },
             update: |_,_,_| {},
-            player_enter_condition: |floor_y,position_y,_,_| position_y == floor_y,
-            player_exit_condition: |floor_y,position_y,_,_| position_y == floor_y,
+            player_enter_condition: |floor_z,position_z,_,_| position_z == floor_z,
+            player_exit_condition: |floor_z,position_z,_,_| position_z == floor_z,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
             sprite_name: "Idle".to_string(),
@@ -230,11 +235,11 @@ impl Default for FighterMovementMap {
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
         FighterMovementNode{
             movement: FighterMovement::RunningRight,
-            player_enter_condition: |floor_y,position_y,
+            player_enter_condition: |floor_z,position_z,
                                      fighter_movement_stack,
                                      event_keyset_stack| {
                 let window_time = 0.3;
-                let cond1 = position_y == floor_y;
+                let cond1 = position_z == floor_z;
 
                 //search for double pressed in window
                 let mut pressed = 0;
@@ -278,14 +283,100 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up]),
+        FighterMovementNode{
+            movement: FighterMovement::WalkingUp,
+            enter: |_, fighter_velocity| {
+                fighter_velocity.y = WALKING_SPEED;
+            },
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.y += fighter_velocity.y * delta_time;
+            },
+            sprite_name: "Walking".to_string(),
+            ..default()}
+        );
+
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
+        FighterMovementNode{
+            movement: FighterMovement::WalkingDown,
+            enter: |_, fighter_velocity| {
+                fighter_velocity.y = -WALKING_SPEED;
+            },
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.y += fighter_velocity.y * delta_time;
+            },
+            sprite_name: "Walking".to_string(),
+            ..default()}
+        );
+
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right, KeyTarget::Up]),
+        FighterMovementNode{
+            movement: FighterMovement::WalkingNorthEast,
+            enter: |_, fighter_velocity| {
+                fighter_velocity.x = WALKING_SPEED/1.41;
+                fighter_velocity.y = WALKING_SPEED/1.41;
+            },
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.x += fighter_velocity.x * delta_time;
+                fighter_position.y += fighter_velocity.y * delta_time;
+            },
+            sprite_name: "Walking".to_string(),
+            ..default()}
+        );
+
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up, KeyTarget::Left]),
+        FighterMovementNode{
+            movement: FighterMovement::WalkingNorthWest,
+            enter: |_, fighter_velocity| {
+                fighter_velocity.x = -WALKING_SPEED/1.41;
+                fighter_velocity.y = WALKING_SPEED/1.41;
+            },
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.x += fighter_velocity.x * delta_time;
+                fighter_position.y += fighter_velocity.y * delta_time;
+            },
+            sprite_name: "Walking".to_string(),
+            ..default()}
+        );
+
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down, KeyTarget::Right]),
+        FighterMovementNode{
+            movement: FighterMovement::WalkingSouthEast,
+            enter: |_, fighter_velocity| {
+                fighter_velocity.x = WALKING_SPEED/1.41;
+                fighter_velocity.y = -WALKING_SPEED/1.41;
+            },
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.x += fighter_velocity.x * delta_time;
+                fighter_position.y += fighter_velocity.y * delta_time;
+            },
+            sprite_name: "Walking".to_string(),
+            ..default()}
+        );
+
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down, KeyTarget::Left]),
+        FighterMovementNode{
+            movement: FighterMovement::WalkingSouthWest,
+            enter: |_, fighter_velocity| {
+                fighter_velocity.x = -WALKING_SPEED/1.41;
+                fighter_velocity.y = -WALKING_SPEED/1.41;
+            },
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.x += fighter_velocity.x * delta_time;
+                fighter_position.y += fighter_velocity.y * delta_time;
+            },
+            sprite_name: "Walking".to_string(),
+            ..default()}
+        );
+
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::LeftJustPressed]),
         FighterMovementNode{
             movement: FighterMovement::RunningLeft,
-            player_enter_condition: |floor_y,position_y,
+            player_enter_condition: |floor_z,position_z,
                                      fighter_movement_stack,
                                      event_keyset_stack| {
                 let window_time = 0.3;
-                let cond1 = position_y == floor_y;
+                let cond1 = position_z == floor_z;
 
                 //search for double pressed in window
                 let mut pressed = 0;
@@ -316,7 +407,7 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
+        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Defend]),
         FighterMovementNode{
             movement: FighterMovement::Docking,
             enter: |_, fighter_velocity| {
@@ -327,16 +418,17 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
-        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::UpJustPressed]),
+        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::JumpJustPressed]),
         FighterMovementNode{
             movement: FighterMovement::Jumping,
             enter: |_, fighter_velocity| {
-                fighter_velocity.y = JUMPING_SPEED;
+                fighter_velocity.z = JUMPING_SPEED;
             },
             update: |fighter_position, fighter_velocity, delta_time| {
                 fighter_position.x += fighter_velocity.x * delta_time;
                 fighter_position.y += fighter_velocity.y * delta_time;
-                fighter_velocity.y += GRAVITY * delta_time;
+                fighter_position.z += fighter_velocity.z * delta_time;
+                fighter_velocity.z += GRAVITY * delta_time;
             },
             sprite_name: "JumpLoop".to_string(),
             ..default()}
@@ -349,8 +441,8 @@ impl Default for FighterMovementMap {
                 fighter_velocity.x = 0.0;
                 fighter_velocity.y = 0.0;
             },
-            player_exit_condition: |floor_y, position_y,movement_duration,_| 
-                floor_y == position_y && movement_duration > 0.5,
+            player_exit_condition: |floor_z, position_z,movement_duration,_| 
+                floor_z == position_z && movement_duration > 0.5,
             sprite_name: "Slashing".to_string(),
             ..default()}
         );
@@ -361,7 +453,8 @@ impl Default for FighterMovementMap {
             update: |fighter_position, fighter_velocity, delta_time| {
                 fighter_position.x += fighter_velocity.x * delta_time;
                 fighter_position.y += fighter_velocity.y * delta_time;
-                fighter_velocity.y += GRAVITY * delta_time;
+                fighter_position.z += fighter_velocity.z * delta_time;
+                fighter_velocity.z += GRAVITY * delta_time;
             },
             sprite_name: "JumpLoop".to_string(),
             ..default()}

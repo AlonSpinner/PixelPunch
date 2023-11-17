@@ -17,10 +17,12 @@ use utils::*;
 
 //scene
 
-const CEILING_Y : f32 = 300.0;
-const FLOOR_Y : f32 = -300.0;
-const LEFT_WALL_X : f32 = -450.0;
-const RIGHT_WALL_X : f32 = 450.0;
+const CEILING_Z : f32 = -100.0;
+const FLOOR_Z : f32 = -335.0;
+const NORTH_WALL_Y : f32 = 80.0;
+const SOUTH_WALL_Y : f32 = -80.0;
+const EAST_WALL_X : f32 = 450.0;
+const WEST_WALL_X : f32 = -450.0;
 
 //controls and visuals
 const ANIMATION_TIME : f32 = 0.1;
@@ -86,8 +88,8 @@ impl Default for PlayerBundle {
             player: Player::Player1,
             fighter: Fighter::IDF,
             health : FighterHealth(100.0),
-            position : FighterPosition{x : 0.0, y :0.0},
-            velocity : FighterVelocity{x : 0.0, y :0.0},
+            position : FighterPosition{x : 0.0, y :0.0, z : 0.0},
+            velocity : FighterVelocity{x : 0.0, y :0.0, z :0.0},
             movement_stack : movement_stack,
             event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
             sprite : SpriteSheetBundle::default(),
@@ -234,8 +236,8 @@ fn setup_game(
     commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
                                         player : player,
                                         fighter : fighter,
-                                        position : FighterPosition{x : LEFT_WALL_X + 200.0, y :0.0},
-                                        velocity : FighterVelocity{x : 0.0, y :-JUMPING_SPEED},
+                                        position : FighterPosition{x : WEST_WALL_X + 200.0, y :0.0, z : CEILING_Z},
+                                        velocity : FighterVelocity{x : 0.0, y : 0.0, z: -JUMPING_SPEED},
                                         ..default()});
 
     // player2
@@ -246,8 +248,9 @@ fn setup_game(
         down: KeyCode::Down,
         left: KeyCode::Left,
         right: KeyCode::Right,
-        defend: KeyCode::ShiftRight,
-        attack: KeyCode::Return,
+        attack: KeyCode::Period,
+        jump: KeyCode::Comma,
+        defend: KeyCode::M
     };
 
     let sprite_sheet_bundle = SpriteSheetBundle {
@@ -257,8 +260,8 @@ fn setup_game(
     commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
                                         player : player,
                                         fighter : fighter,
-                                        position : FighterPosition{x : RIGHT_WALL_X - 200.0, y :0.0},
-                                        velocity : FighterVelocity{x : 0.0, y :-JUMPING_SPEED},
+                                        position : FighterPosition{x : EAST_WALL_X - 200.0, y :0.0, z : CEILING_Z},
+                                        velocity : FighterVelocity{x : 0.0, y : 0.0, z : -JUMPING_SPEED},
                                         controls: player2_controls,
                                         ..default()});
     
@@ -296,7 +299,7 @@ fn player_control(mut query: Query<(&Fighter,
             
         //if cant exist movement
         if !fighter_map.name_map.get(&last_durative_movement.value).unwrap()
-                .player_exit_condition(FLOOR_Y, position.y, last_durative_movement.duration, &full_keytargetset) {
+                .player_exit_condition(FLOOR_Z, position.z, last_durative_movement.duration, &full_keytargetset) {
             continue;
         }
 
@@ -305,7 +308,7 @@ fn player_control(mut query: Query<(&Fighter,
         //check for events
         if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
             if movement_node.movement == last_durative_movement.value {continue};
-            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_stack, &event_keytargetset_stack) {
+            if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, &event_keytargetset_stack) {
                 info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
                 movement_stack.0.push(movement_node.movement);
                 movement_node.enter(&mut position, &mut velocity);
@@ -315,7 +318,7 @@ fn player_control(mut query: Query<(&Fighter,
         // check for persistent movements
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
             if movement_node.movement == last_durative_movement.value {continue};
-            if movement_node.player_enter_condition(FLOOR_Y, position.y, &movement_stack, &event_keytargetset_stack) {
+            if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, &event_keytargetset_stack) {
                 info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
                 movement_stack.0.push(movement_node.movement);
                 movement_node.enter(&mut position, &mut velocity);
@@ -347,8 +350,9 @@ fn update_state(mut query: Query<(&Fighter,
         if let Some(last_durative_movement) = movement_stack.0.stack.last() {
             let movement_node = fighter_map.name_map.get(&last_durative_movement.value).unwrap();
             movement_node.update(&mut position, &mut velocity, dt);
-            position.x = position.x.clamp(LEFT_WALL_X,RIGHT_WALL_X);
-            position.y = position.y.clamp(FLOOR_Y, CEILING_Y);
+            position.x = position.x.clamp(WEST_WALL_X,EAST_WALL_X);
+            position.y = position.y.clamp(SOUTH_WALL_Y, NORTH_WALL_Y);
+            position.z = position.z.clamp(FLOOR_Z, CEILING_Z);
         }
     }
 }
@@ -386,7 +390,8 @@ fn draw_fighters(time: Res<Time>,
                 }
             }
             
-            transform.translation = Vec3::new(position.x, position.y, 0.0);
+            let uv = project_xyz_2_uv(position.into());
+            transform.translation = Vec3::new(uv[0], uv[1], 0.0);
     
             if velocity.x > 0.0 {
                 sprite.flip_x = false;

@@ -17,6 +17,8 @@ pub enum KeyTarget{
     RightJustPressed,
     Attack,
     AttackJustPressed,
+    Jump,
+    JumpJustPressed,
     Defend,
     DefendJustPressed,
 }
@@ -105,6 +107,7 @@ pub struct PlayerControls{
     pub left : KeyCode,
     pub right : KeyCode,
     pub attack : KeyCode,
+    pub jump : KeyCode,
     pub defend : KeyCode,
 }
 
@@ -116,7 +119,8 @@ impl Default for PlayerControls {
             left : KeyCode::A,
             right : KeyCode::D,
             attack: KeyCode::G,
-            defend: KeyCode::H,
+            jump: KeyCode::H,
+            defend: KeyCode::J,
         }
     }
 }
@@ -138,6 +142,9 @@ impl PlayerControls {
         }
         if keyboard_input.pressed(self.attack) {
             pressed_keys = pressed_keys + KeyTarget::Attack;
+        }
+        if keyboard_input.pressed(self.attack) {
+            pressed_keys = pressed_keys + KeyTarget::Jump;
         }
         if keyboard_input.pressed(self.defend) {
             pressed_keys = pressed_keys + KeyTarget::Defend;
@@ -161,6 +168,9 @@ impl PlayerControls {
         }
         if keyboard_input.just_pressed(self.attack) {
             just_pressed_keys = just_pressed_keys + KeyTarget::AttackJustPressed;
+        }
+        if keyboard_input.just_pressed(self.jump) {
+            just_pressed_keys = just_pressed_keys + KeyTarget::JumpJustPressed;
         }
         if keyboard_input.just_pressed(self.defend) {
             just_pressed_keys = just_pressed_keys + KeyTarget::DefendJustPressed;
