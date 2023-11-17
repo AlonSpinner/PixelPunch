@@ -21,6 +21,10 @@ T : std::fmt::Debug,
             max_size,
         }
     }
+
+    pub fn pop(&mut self) -> Option<TimeTaggedValue<T>> {
+        self.stack.pop()
+    }
     
     pub fn push(&mut self, value : T) {
         if self.stack.len() == self.max_size {
@@ -56,6 +60,10 @@ T : std::fmt::Debug,
             max_size,
             max_duration,
         }
+    }
+
+    pub fn pop(&mut self) -> Option<TimeTaggedValue<T>> {
+        self.stack.pop()
     }
     
     pub fn push(&mut self, value : T) {

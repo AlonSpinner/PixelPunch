@@ -312,11 +312,12 @@ fn player_control(mut query: Query<(&Fighter,
 
         event_keytargetset_stack.0.push(event_keytargetset);
         let joined_event_keytargetset = event_keytargetset_stack.join();
+        let inner_event_keytargetset_stack = event_keytargetset_stack.into_inner();
         //check for events
         if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
             info!("trying to get into event node {}",&movement_node.movement);
             if movement_node.movement == last_durative_movement.value {continue};
-            if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, &event_keytargetset_stack) {
+            if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, inner_event_keytargetset_stack) {
                 info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
                 movement_stack.0.push(movement_node.movement);
                 movement_node.enter(&mut position, &mut velocity);
@@ -327,7 +328,7 @@ fn player_control(mut query: Query<(&Fighter,
         // check for persistent movements
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
             if movement_node.movement == last_durative_movement.value {continue};
-            if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, &event_keytargetset_stack) {
+            if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, inner_event_keytargetset_stack) {
                 info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
                 movement_stack.0.push(movement_node.movement);
                 movement_node.enter(&mut position, &mut velocity);

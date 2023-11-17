@@ -91,7 +91,7 @@ pub struct FighterMovementNode {
     player_enter_condition : fn(floor_z : f32,
                                     position_z : f32,
                                     fighter_movement_stack : &FighterMovementStack,
-                                    keyset : &KeyTargetSetStack) -> bool,
+                                    keyset : &mut KeyTargetSetStack) -> bool,
     player_exit_condition : fn(floor_z : f32,
                                     position_z : f32,
                                     movement_duration : f32,
@@ -111,7 +111,7 @@ impl FighterMovementNode {
     pub fn player_enter_condition(&self, floor_z : f32,
                                         position_z : f32,
                                         fighter_movement_stack : &FighterMovementStack,
-                                        keyset_stack :&KeyTargetSetStack) -> bool {
+                                        keyset_stack :&mut KeyTargetSetStack) -> bool {
         (self.player_enter_condition)(floor_z, position_z, fighter_movement_stack,keyset_stack)
     }
     pub fn player_exit_condition(&self, floor_z :f32,
@@ -238,31 +238,42 @@ impl Default for FighterMovementMap {
         FighterMovementNode{
             movement: FighterMovement::RunningEast,
             player_enter_condition: |floor_z,position_z,
-                                     fighter_movement_stack,
-                                     event_keyset_stack| {
+                                    fighter_movement_stack,
+                                    event_keyset_stack| {
                 let window_time = 0.3;
                 let cond1 = position_z == floor_z;
 
                 //search for double pressed in window
                 let mut pressed = 0;
+                let mut elements = 0;
                 for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
-                    if timed_keyset.duration > window_time {break};
-                    if timed_keyset.value.is_superset(&KeyTargetSet::from([KeyTarget::RightJustPressed])) {
-                        pressed += 1;
+                    if timed_keyset.duration > window_time || pressed > 1 {break};
+                    if timed_keyset.value.contains(&KeyTarget::RightJustPressed) {
+                    pressed += 1;
                     }
+                    elements += 1;
                 }
                 let cond2 = pressed > 1;
 
-                //make sure window is only filled with idle/walking right
+                //make sure last movement is idle/walking
                 let mut cond3 = true;
                 if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
                     if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingEast {
-                        cond3 = false;
+                       cond3 = false;
                     }
                 }
 
-                cond1 & cond2 & cond3
-            },
+                let cond =cond1 & cond2 & cond3;
+
+                //remove acted upon events from stack
+                if cond == true {
+                    for _ in 0..elements {
+                        event_keyset_stack.0.pop();
+                    }
+                }
+
+                cond
+                },
             player_exit_condition: |_, _, _, keyset| {
                 info!("{}",keyset);
                 if keyset == &KeyTargetSet::empty() {
@@ -410,15 +421,17 @@ impl Default for FighterMovementMap {
 
                 //search for double pressed in window
                 let mut pressed = 0;
+                let mut elements = 0;
                 for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
-                    if timed_keyset.duration > window_time {break};
-                    if timed_keyset.value.is_superset(&KeyTargetSet::from([KeyTarget::LeftJustPressed])) {
+                    if timed_keyset.duration > window_time || pressed > 1 {break};
+                    if timed_keyset.value.contains(&KeyTarget::LeftJustPressed) {
                         pressed += 1;
                     }
+                    elements += 1;
                 }
                 let cond2 = pressed > 1;
 
-                //make sure window is only filled with idle/walking right
+                //make sure last movement is idle/walking
                 let mut cond3 = true;
                 if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
                     if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingWest {
@@ -426,7 +439,16 @@ impl Default for FighterMovementMap {
                     }
                 }
 
-                cond1 & cond2 & cond3
+                let cond =cond1 & cond2 & cond3;
+
+                //remove acted upon events from stack
+                if cond == true {
+                    for _ in 0..elements {
+                        event_keyset_stack.0.pop();
+                    }
+                }
+
+                cond
             },
             player_exit_condition: |_, _, _, keyset| {
                 info!("{}",keyset);
@@ -442,7 +464,7 @@ impl Default for FighterMovementMap {
 
                 if keyset.overlaps(&KeyTargetSet::from([KeyTarget::Up,
                                                         KeyTarget::Down,
-                                                        KeyTarget::Right])) {
+                                                        KeyTarget::Left])) {
                 return false
                 };
                 true

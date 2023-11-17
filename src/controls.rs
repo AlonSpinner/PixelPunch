@@ -57,6 +57,10 @@ impl KeyTargetSet {
     pub fn overlaps(&self, other: &Self) -> bool {
         !self.0.is_disjoint(&other.0)
     }
+
+    pub fn contains(&self, other: &KeyTarget) -> bool {
+        self.0.contains(other)
+    }
 }
 
 impl<const N: usize> From<[KeyTarget; N]> for KeyTargetSet {
