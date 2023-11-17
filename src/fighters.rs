@@ -64,6 +64,7 @@ pub enum FighterMovement {
     Slashing,
     Jumping,
     RunningRight,
+    RunningNorthEast,
     RunningLeft,
     WalkingRight,
     WalkingLeft,
@@ -103,6 +104,7 @@ pub struct FighterMovementNode {
                     delta_time : f32),
     enter : fn(fighter_position : &mut FighterPosition,
                    fighter_velocity : &mut FighterVelocity),
+    pub channel : Option<fn (full_keyset : &KeyTargetSet, fighter_velocity : &mut FighterVelocity)>,
     pub sprite_name : String,
 }
 
@@ -139,6 +141,7 @@ impl Default for FighterMovementNode {
                 fighter_velocity.y = 0.0;
             },
             update: |_,_,_| {},
+            channel: None,
             player_enter_condition: |floor_z,position_z,_,_| position_z == floor_z,
             player_exit_condition: |floor_z,position_z,_,_| position_z == floor_z,
             hit_boxes: Vec::new(),
@@ -261,11 +264,25 @@ impl Default for FighterMovementMap {
 
                 cond1 & cond2 & cond3
             },
-            player_exit_condition: |_, _, _, keyset| {keyset != &KeyTargetSet::empty()},
+            player_exit_condition: |_, _, _, keyset| {
+                if keyset == &KeyTargetSet::empty() {return false};
+                if KeyTargetSet::from([KeyTarget::Up]).is_subset(keyset) ||
+                    KeyTargetSet::from([KeyTarget::Down]).is_subset(keyset) {return false};
+                true
+            },
             enter: |_, fighter_velocity| {fighter_velocity.x = RUNNING_SPEED;},
             update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time
+                fighter_position.x += fighter_velocity.x * delta_time;
+                fighter_position.y += fighter_velocity.y * delta_time;
             },
+            channel: Some(|full_keyset, fighter_velocity| {
+                if KeyTargetSet::from([KeyTarget::Up]).is_subset(full_keyset) {
+                    fighter_velocity.y = WALKING_SPEED/2.0;
+                }
+                if KeyTargetSet::from([KeyTarget::Down]).is_subset(full_keyset) {
+                    fighter_velocity.y = -WALKING_SPEED/2.0;
+                }
+            }),
             sprite_name: "Running".to_string(),
             ..default()}
         );
@@ -398,11 +415,30 @@ impl Default for FighterMovementMap {
 
                 cond1 & cond2 & cond3
             },
-            player_exit_condition: |_, _, _, keyset| {keyset != &KeyTargetSet::empty()},
+            player_exit_condition: |_, _, _, keyset| {
+                if keyset == &KeyTargetSet::empty() {return false};
+                
+                if KeyTargetSet::from([KeyTarget::Jump]).is_subset(keyset) ||
+                KeyTargetSet::from([KeyTarget::Attack]).is_subset(keyset) ||
+                KeyTargetSet::from([KeyTarget::Defend]).is_subset(keyset) {return true};
+                
+                if KeyTargetSet::from([KeyTarget::Up]).is_subset(keyset) ||
+                    KeyTargetSet::from([KeyTarget::Down]).is_subset(keyset) {return false};
+                true
+            },
             enter: |_, fighter_velocity| {fighter_velocity.x = -RUNNING_SPEED;},
             update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time
+                fighter_position.x += fighter_velocity.x * delta_time;
+                fighter_position.y += fighter_velocity.y * delta_time;
             },
+            channel: Some(|full_keyset, fighter_velocity| {
+                if KeyTargetSet::from([KeyTarget::Up]).is_subset(full_keyset) {
+                    fighter_velocity.y = WALKING_SPEED/2.0;
+                }
+                if KeyTargetSet::from([KeyTarget::Down]).is_subset(full_keyset) {
+                    fighter_velocity.y = -WALKING_SPEED/2.0;
+                }
+            }),
             sprite_name: "Running".to_string(),
             ..default()}
         );

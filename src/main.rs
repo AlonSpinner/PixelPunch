@@ -21,8 +21,8 @@ const CEILING_Z : f32 = -100.0;
 const FLOOR_Z : f32 = -335.0;
 const NORTH_WALL_Y : f32 = 80.0;
 const SOUTH_WALL_Y : f32 = -80.0;
-const EAST_WALL_X : f32 = 450.0;
-const WEST_WALL_X : f32 = -450.0;
+const EAST_WALL_X : f32 = 600.0;
+const WEST_WALL_X : f32 = -600.0;
 
 //controls and visuals
 const ANIMATION_TIME : f32 = 0.1;
@@ -204,7 +204,7 @@ fn setup_game(
         sprite: Sprite {
             custom_size: Some(Vec2::new(window.width(), window.height())),
             ..default()},
-        transform: Transform::from_xyz(0.0, 0.0, -1.0),
+        transform: Transform::from_xyz(0.0, 0.0, -NORTH_WALL_Y),
         ..default()
     });
 
@@ -296,10 +296,14 @@ fn player_control(mut query: Query<(&Fighter,
         event_keytargetset_stack.0.update(time.delta_seconds());
         movement_stack.0.update(time.delta_seconds());
         let last_durative_movement = movement_stack.0.stack.last().unwrap();
+        let last_movement_node = fighter_map.name_map.get(&last_durative_movement.value).unwrap();
             
         //if cant exist movement
-        if !fighter_map.name_map.get(&last_durative_movement.value).unwrap()
-                .player_exit_condition(FLOOR_Z, position.z, last_durative_movement.duration, &full_keytargetset) {
+        if !last_movement_node.player_exit_condition(FLOOR_Z, position.z, last_durative_movement.duration, &full_keytargetset) {
+            //check for channels
+            if let Some(channel_function) = last_movement_node.channel{
+                channel_function(&full_keytargetset, &mut velocity);
+            }
             continue;
         }
 
@@ -315,6 +319,7 @@ fn player_control(mut query: Query<(&Fighter,
                 continue;
             }
         }
+
         // check for persistent movements
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
             if movement_node.movement == last_durative_movement.value {continue};
@@ -390,8 +395,8 @@ fn draw_fighters(time: Res<Time>,
                 }
             }
             
-            let uv = project_xyz_2_uv(position.into());
-            transform.translation = Vec3::new(uv[0], uv[1], 0.0);
+            let uvw = project_xyz_2_uvw(position.into());
+            transform.translation = Vec3::new(uvw[0], uvw[1], uvw[2]);
     
             if velocity.x > 0.0 {
                 sprite.flip_x = false;
