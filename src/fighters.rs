@@ -75,6 +75,7 @@ pub enum FighterMovement {
     WalkingSouthWest,
     Docking,
     InAir,
+    JumpAttack,
 }
 
 #[derive(Component)]
@@ -311,6 +312,28 @@ impl Default for FighterMovementMap {
             ..default()}
         );
 
+        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed]),
+        FighterMovementNode{
+            movement: FighterMovement::JumpAttack,
+            update: |fighter_position, fighter_velocity, delta_time| {
+                fighter_position.x += fighter_velocity.x * delta_time;
+                fighter_position.y += fighter_velocity.y * delta_time;
+                fighter_position.z += fighter_velocity.z * delta_time;
+            },
+            player_enter_condition: |floor_z,position_z,
+                                    fighter_movement_stack,
+                                    event_keyset_stack| {
+                                        
+                if floor_z == position_z {return false};
+                if let Some(last_durative_movement) = fighter_movement_stack.0.stack.last() {
+                    if last_durative_movement.value == FighterMovement::Jumping {return true};
+                }
+                return false;
+            },
+            sprite_name: "AirSlashing".to_string(),
+            ..default()}
+        );
+
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Left]),
         FighterMovementNode{
             movement: FighterMovement::WalkingWest,
@@ -509,6 +532,16 @@ impl Default for FighterMovementMap {
                 fighter_position.z += fighter_velocity.z * delta_time;
                 fighter_velocity.z += GRAVITY * delta_time;
             },
+            player_exit_condition: |floor_z,position_z,_,full_keytargetset| 
+                {
+                    if full_keytargetset.contains(&KeyTarget::AttackJustPressed) {
+                        return true
+                    } else if position_z == floor_z {
+                        return true}
+                    else {
+                        return false};
+                },
+                
             sprite_name: "JumpLoop".to_string(),
             ..default()}
         );
