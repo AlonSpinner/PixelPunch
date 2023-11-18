@@ -293,54 +293,59 @@ fn player_control(mut query: Query<(&Fighter,
         let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
         let full_keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+        
         event_keytargetset_stack.0.update(time.delta_seconds());
         movement_stack.0.update(time.delta_seconds());
         let last_durative_movement = movement_stack.0.stack.last().unwrap();
         let last_movement_node = fighter_map.name_map.get(&last_durative_movement.value).unwrap();
 
-        // info!("{}",last_movement_node.movement.to_string());
-        //if cant exist movement
-        if !last_movement_node.player_exit_condition(FLOOR_Z, position.z, last_durative_movement.duration, &full_keytargetset) {
-            //check for channels
-            if let Some(channel_function) = last_movement_node.channel{
-                channel_function(&full_keytargetset, &mut velocity);
-            }
-            // info!("did not exit");
-            continue;
-        }
-        info!("exited");
-
         event_keytargetset_stack.0.push(event_keytargetset);
         let joined_event_keytargetset = event_keytargetset_stack.join();
         let inner_event_keytargetset_stack = event_keytargetset_stack.into_inner();
         //check for events
+        let mut event_movement_request: Option<FighterMovementNodeRequest> = None;
         if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
-            info!("trying to get into event node {}",&movement_node.movement);
             if movement_node.movement == last_durative_movement.value {continue};
             if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, inner_event_keytargetset_stack) {
-                info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
-                movement_stack.0.push(movement_node.movement);
-                movement_node.enter(&mut position, &mut velocity);
-                continue;
+                event_movement_request = Some(FighterMovementNodeRequest{movement : movement_node.movement});
             }
         }
 
         // check for persistent movements
+        let mut persistent_movement_request: Option<FighterMovementNodeRequest> = None;
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
             if movement_node.movement == last_durative_movement.value {continue};
             if movement_node.player_enter_condition(FLOOR_Z, position.z, &movement_stack, inner_event_keytargetset_stack) {
-                info!("fighter {} entered movement {}", &fighter, &movement_node.movement);
-                movement_stack.0.push(movement_node.movement);
-                movement_node.enter(&mut position, &mut velocity);
-                continue;
+                persistent_movement_request = Some(FighterMovementNodeRequest{movement : movement_node.movement});
             }
         }
 
+        let mut idle_movement_request: Option<FighterMovementNodeRequest> = None;
         if last_durative_movement.value != FighterMovement::Idle {
-            let movement_node = fighter_map.name_map.get(&FighterMovement::Idle).unwrap();
-            info!("fighter {} entered movement Idle for lack of action", &fighter);
-            movement_stack.0.push(movement_node.movement);
-            movement_node.enter(&mut position, &mut velocity);
+            idle_movement_request = Some(FighterMovementNodeRequest { movement: FighterMovement::Idle });
+        }
+
+        if let Some(valid_request) = event_movement_request {
+            if !last_movement_node.player_exit_condition(FLOOR_Z, position.z,
+                last_durative_movement.duration,
+               &valid_request) {
+            fighter_map.name_map.get(&valid_request.movement).unwrap().enter(
+                &mut position, &mut velocity);
+            movement_stack.0.push(valid_request.movement);
+        } else if let Some(valid_request) = persistent_movement_request {
+            fighter_map.name_map.get(&valid_request.movement).unwrap().enter(
+                &mut position, &mut velocity);
+            movement_stack.0.push(valid_request.movement);
+        } else if let Some(valid_request) = idle_movement_request {
+            fighter_map.name_map.get(&valid_request.movement).unwrap().enter(
+                &mut position, &mut velocity);
+            movement_stack.0.push(valid_request.movement);
+        }
+
+        //if transition to new node hasnt occured, check for channels
+        //channels - pressing a button in a certain movement does something while remaining in that movement
+        if let Some(channel_function) = last_movement_node.channel{
+            channel_function(&full_keytargetset, &mut velocity);
         }
     }
 }

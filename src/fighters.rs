@@ -87,6 +87,10 @@ impl FighterMovementStack {
 }
 pub struct HitBox;
 
+pub struct FighterMovementNodeRequest {
+    pub movement: FighterMovement,
+}
+
 pub struct FighterMovementNode {
     pub movement: FighterMovement,
     player_enter_condition : fn(floor_z : f32,
@@ -96,7 +100,7 @@ pub struct FighterMovementNode {
     player_exit_condition : fn(floor_z : f32,
                                     position_z : f32,
                                     movement_duration : f32,
-                                    keyset : &KeyTargetSet) -> bool,
+                                    request : &FighterMovementNodeRequest) -> bool,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
     update : fn(fighter_position : &mut FighterPosition,
@@ -118,8 +122,8 @@ impl FighterMovementNode {
     pub fn player_exit_condition(&self, floor_z :f32,
                                         position_z : f32,
                                         movement_duration : f32,
-                                        keyset : &KeyTargetSet) -> bool {
-        (self.player_exit_condition)(floor_z, position_z, movement_duration, keyset)
+                                        request : &FighterMovementNodeRequest) -> bool {
+        (self.player_exit_condition)(floor_z, position_z, movement_duration, request)
     }
     pub fn update(&self, fighter_position : &mut FighterPosition,
                          fighter_velocity : &mut FighterVelocity,
@@ -275,25 +279,19 @@ impl Default for FighterMovementMap {
 
                 cond
                 },
-            player_exit_condition: |_, _, _, keyset| {
-                info!("{}",keyset);
-                if keyset == &KeyTargetSet::empty() {
-                    return false
-                };
+            player_exit_condition: |_, _, _, request| {
+                let unallowed_transitions = [
+                    FighterMovement::WalkingEast,
+                    FighterMovement::WalkingNorth,
+                    FighterMovement::WalkingSouth,
+                    FighterMovement::WalkingNorthEast,
+                    FighterMovement::WalkingSouthEast,
+                ];
 
-                if keyset.overlaps(&KeyTargetSet::from([KeyTarget::JumpJustPressed,
-                                                        KeyTarget::AttackJustPressed,
-                                                        KeyTarget::DefendJustPressed])) {
-                    info!("returned true");
-                    return true
-                };
-
-                if keyset.overlaps(&KeyTargetSet::from([KeyTarget::Up,
-                                                        KeyTarget::Down,
-                                                        KeyTarget::Right])) {
-                return false
-                };
-                true
+                for movement in unallowed_transitions {
+                    if request.movement == movement {return false};
+                }
+                return true;
             },
             enter: |_, fighter_velocity| {fighter_velocity.x = RUNNING_SPEED;},
             update: |fighter_position, fighter_velocity, delta_time| {
@@ -473,24 +471,19 @@ impl Default for FighterMovementMap {
 
                 cond
             },
-            player_exit_condition: |_, _, _, keyset| {
-                info!("{}",keyset);
-                if keyset == &KeyTargetSet::empty() {
-                    return false
-                };
+            player_exit_condition: |_, _, _, request| {
+                let unallowed_transitions = [
+                    FighterMovement::WalkingWest,
+                    FighterMovement::WalkingNorth,
+                    FighterMovement::WalkingSouth,
+                    FighterMovement::WalkingNorthWest,
+                    FighterMovement::WalkingSouthWest,
+                ];
 
-                if keyset.overlaps(&KeyTargetSet::from([KeyTarget::JumpJustPressed,
-                                                        KeyTarget::AttackJustPressed,
-                                                        KeyTarget::DefendJustPressed])) {
-                    return true
-                };
-
-                if keyset.overlaps(&KeyTargetSet::from([KeyTarget::Up,
-                                                        KeyTarget::Down,
-                                                        KeyTarget::Left])) {
-                return false
-                };
-                true
+                for movement in unallowed_transitions {
+                    if request.movement == movement {return false};
+                }
+                return true;
             },
             enter: |_, fighter_velocity| {fighter_velocity.x = -RUNNING_SPEED;},
             update: |fighter_position, fighter_velocity, delta_time| {
@@ -532,9 +525,9 @@ impl Default for FighterMovementMap {
                 fighter_position.z += fighter_velocity.z * delta_time;
                 fighter_velocity.z += GRAVITY * delta_time;
             },
-            player_exit_condition: |floor_z,position_z,_,full_keytargetset| 
+            player_exit_condition: |floor_z,position_z,_,request| 
                 {
-                    if full_keytargetset.contains(&KeyTarget::AttackJustPressed) {
+                    if request.movement == FighterMovement::JumpAttack {
                         return true
                     } else if position_z == floor_z {
                         return true}
