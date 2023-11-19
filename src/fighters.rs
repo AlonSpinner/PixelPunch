@@ -87,20 +87,16 @@ impl FighterMovementStack {
 }
 pub struct HitBox;
 
-pub struct FighterMovementNodeRequest {
-    pub movement: FighterMovement,
-}
-
 pub struct FighterMovementNode {
     pub movement: FighterMovement,
-    player_enter_condition : fn(floor_z : f32,
+    player_can_enter : fn(floor_z : f32,
                                     position_z : f32,
                                     fighter_movement_stack : &FighterMovementStack,
                                     keyset : &mut KeyTargetSetStack) -> bool,
-    player_exit_condition : fn(floor_z : f32,
+    player_can_exit : fn(floor_z : f32,
                                     position_z : f32,
                                     movement_duration : f32,
-                                    request : &FighterMovementNodeRequest) -> bool,
+                                    movement_request : &FighterMovement) -> bool,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
     update : fn(fighter_position : &mut FighterPosition,
@@ -113,17 +109,17 @@ pub struct FighterMovementNode {
 }
 
 impl FighterMovementNode {
-    pub fn player_enter_condition(&self, floor_z : f32,
+    pub fn player_can_enter(&self, floor_z : f32,
                                         position_z : f32,
                                         fighter_movement_stack : &FighterMovementStack,
                                         keyset_stack :&mut KeyTargetSetStack) -> bool {
-        (self.player_enter_condition)(floor_z, position_z, fighter_movement_stack,keyset_stack)
+        (self.player_can_enter)(floor_z, position_z, fighter_movement_stack,keyset_stack)
     }
-    pub fn player_exit_condition(&self, floor_z :f32,
+    pub fn player_can_exit(&self, floor_z :f32,
                                         position_z : f32,
                                         movement_duration : f32,
-                                        request : &FighterMovementNodeRequest) -> bool {
-        (self.player_exit_condition)(floor_z, position_z, movement_duration, request)
+                                        movement_request : &FighterMovement) -> bool {
+        (self.player_can_exit)(floor_z, position_z, movement_duration, movement_request)
     }
     pub fn update(&self, fighter_position : &mut FighterPosition,
                          fighter_velocity : &mut FighterVelocity,
@@ -146,8 +142,8 @@ impl Default for FighterMovementNode {
             },
             update: |_,_,_| {},
             channel: None,
-            player_enter_condition: |floor_z,position_z,_,_| position_z == floor_z,
-            player_exit_condition: |floor_z,position_z,_,_| position_z == floor_z,
+            player_can_enter: |floor_z,position_z,_,_| position_z == floor_z,
+            player_can_exit: |floor_z,position_z,_,_| position_z == floor_z,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
             sprite_name: "Idle".to_string(),
@@ -159,7 +155,7 @@ impl Default for FighterMovementNode {
 pub struct FighterMovementMap {
     pub event_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
     pub persistent_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
-    pub name_map : HashMap<FighterMovement, Arc<FighterMovementNode>>,
+    pub movement_map : HashMap<FighterMovement, Arc<FighterMovementNode>>,
 }
 
 impl FighterMovementMap {
@@ -167,14 +163,18 @@ impl FighterMovementMap {
         Self{
             event_map : HashMap::new(),
             persistent_map : HashMap::new(),
-            name_map : HashMap::new(),
+            movement_map : HashMap::new(),
         }
+    }
+
+    pub fn get(&self, movement: &FighterMovement) -> &FighterMovementNode {
+        self.movement_map.get(movement).unwrap().as_ref()
     }
 
     fn ensure_must_exists_movements(self) -> Self{
         let must_exist_movements = [FighterMovement::Idle];
         for movement in must_exist_movements.iter() {
-            if !self.name_map.contains_key(movement) {
+            if !self.movement_map.contains_key(movement) {
                 panic!("Movement {} must exist in the FighterMovementMap", movement);
             }
         }
@@ -187,9 +187,9 @@ impl FighterMovementMap {
         } else if self.persistent_map.contains_key(keyset) {
             panic!("Keyset {:?} already contained in the persistent_map", keyset);
         } else if {
-            self.name_map.contains_key(&node.movement)
+            self.movement_map.contains_key(&node.movement)
         } {
-            panic!("Node with fighter movment {} already contained in the name_map", node.movement);
+            panic!("Node with fighter movment {} already contained in the movement_map", node.movement);
         }
     }
 
@@ -197,7 +197,7 @@ impl FighterMovementMap {
         self.check_if_can_insert_node(&keyset, &node);
         let node_name = node.movement.clone();
         let arc_movement_node = Arc::new(node);
-        self.name_map.insert(node_name, arc_movement_node.clone());
+        self.movement_map.insert(node_name, arc_movement_node.clone());
         self.event_map.insert(keyset, arc_movement_node);
     }
 
@@ -205,18 +205,18 @@ impl FighterMovementMap {
         self.check_if_can_insert_node(&keyset, &node);
         let node_name = node.movement.clone();
         let arc_movement_node = Arc::new(node);
-        self.name_map.insert(node_name, arc_movement_node.clone());
+        self.movement_map.insert(node_name, arc_movement_node.clone());
         self.persistent_map.insert(keyset, arc_movement_node);
     }
 
     //by_name map may contain nodes that are not in the keyset_map
-    pub fn insert_to_name_map(&mut self, node : FighterMovementNode) {
-        if self.name_map.contains_key(&node.movement) {
+    pub fn insert_to_movement_map(&mut self, node : FighterMovementNode) {
+        if self.movement_map.contains_key(&node.movement) {
             panic!("node with that name {} already exists in the map", &node.movement);
         } else {
         let node_name = node.movement.clone();
         let arc_movement_node = Arc::new(node);
-        self.name_map.insert(node_name, arc_movement_node.clone());
+        self.movement_map.insert(node_name, arc_movement_node.clone());
         }
     }
 }
@@ -224,7 +224,7 @@ impl FighterMovementMap {
 impl Default for FighterMovementMap {
     fn default() -> Self {
         let mut map = Self::new();
-        map.insert_to_name_map(FighterMovementNode::default());
+        map.insert_to_movement_map(FighterMovementNode::default());
                     
         map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
         FighterMovementNode{
@@ -242,7 +242,7 @@ impl Default for FighterMovementMap {
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
         FighterMovementNode{
             movement: FighterMovement::RunningEast,
-            player_enter_condition: |floor_z,position_z,
+            player_can_enter: |floor_z,position_z,
                                     fighter_movement_stack,
                                     event_keyset_stack| {
                 let window_time = 0.3;
@@ -253,9 +253,7 @@ impl Default for FighterMovementMap {
                 let mut elements = 0;
                 for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
                     if timed_keyset.duration > window_time || pressed > 1 {break};
-                    if timed_keyset.value.contains(&KeyTarget::RightJustPressed) {
-                    pressed += 1;
-                    }
+                    if timed_keyset.value.contains(&KeyTarget::RightJustPressed) {pressed += 1};
                     elements += 1;
                 }
                 let cond2 = pressed > 1;
@@ -279,17 +277,18 @@ impl Default for FighterMovementMap {
 
                 cond
                 },
-            player_exit_condition: |_, _, _, request| {
+            player_can_exit: |_, _, _, request| {
                 let unallowed_transitions = [
                     FighterMovement::WalkingEast,
                     FighterMovement::WalkingNorth,
                     FighterMovement::WalkingSouth,
                     FighterMovement::WalkingNorthEast,
                     FighterMovement::WalkingSouthEast,
+                    FighterMovement::Idle,
                 ];
 
                 for movement in unallowed_transitions {
-                    if request.movement == movement {return false};
+                    if request == &movement {return false};
                 }
                 return true;
             },
@@ -318,9 +317,9 @@ impl Default for FighterMovementMap {
                 fighter_position.y += fighter_velocity.y * delta_time;
                 fighter_position.z += fighter_velocity.z * delta_time;
             },
-            player_enter_condition: |floor_z,position_z,
+            player_can_enter: |floor_z,position_z,
                                     fighter_movement_stack,
-                                    event_keyset_stack| {
+                                    _| {
                                         
                 if floor_z == position_z {return false};
                 if let Some(last_durative_movement) = fighter_movement_stack.0.stack.last() {
@@ -434,7 +433,7 @@ impl Default for FighterMovementMap {
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::LeftJustPressed]),
         FighterMovementNode{
             movement: FighterMovement::RunningWest,
-            player_enter_condition: |floor_z,position_z,
+            player_can_enter: |floor_z,position_z,
                                      fighter_movement_stack,
                                      event_keyset_stack| {
                 let window_time = 0.3;
@@ -471,17 +470,18 @@ impl Default for FighterMovementMap {
 
                 cond
             },
-            player_exit_condition: |_, _, _, request| {
+            player_can_exit: |_, _, _, request| {
                 let unallowed_transitions = [
                     FighterMovement::WalkingWest,
                     FighterMovement::WalkingNorth,
                     FighterMovement::WalkingSouth,
                     FighterMovement::WalkingNorthWest,
                     FighterMovement::WalkingSouthWest,
+                    FighterMovement::Idle,
                 ];
 
                 for movement in unallowed_transitions {
-                    if request.movement == movement {return false};
+                    if request == &movement {return false};
                 }
                 return true;
             },
@@ -525,9 +525,9 @@ impl Default for FighterMovementMap {
                 fighter_position.z += fighter_velocity.z * delta_time;
                 fighter_velocity.z += GRAVITY * delta_time;
             },
-            player_exit_condition: |floor_z,position_z,_,request| 
+            player_can_exit: |floor_z,position_z,_,request| 
                 {
-                    if request.movement == FighterMovement::JumpAttack {
+                    if request == &FighterMovement::JumpAttack {
                         return true
                     } else if position_z == floor_z {
                         return true}
@@ -546,13 +546,13 @@ impl Default for FighterMovementMap {
                 fighter_velocity.x = 0.0;
                 fighter_velocity.y = 0.0;
             },
-            player_exit_condition: |floor_z, position_z,movement_duration,_| 
+            player_can_exit: |floor_z, position_z,movement_duration,_| 
                 floor_z == position_z && movement_duration > 0.5,
             sprite_name: "Slashing".to_string(),
             ..default()}
         );
 
-        map.insert_to_name_map(
+        map.insert_to_movement_map(
         FighterMovementNode{
             movement: FighterMovement::InAir,
             update: |fighter_position, fighter_velocity, delta_time| {
