@@ -274,348 +274,357 @@ impl FighterMovementMap {
 impl Default for FighterMovementMap {
     fn default() -> Self {
         let mut map = Self::new();
-        map.insert_to_movement_map(FighterMovementNode::default());
+        map.insert_to_uncontrollable_map(UncontrollableFighterMovementNode {
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::Idle,
+                sprite_name: "Idle".to_string(),
+                state_update: |_,_,_| {},
+                state_enter: |pos,vel| {vel.x = 0.0; vel.y = 0.0}, 
+            },
+            hit_box: HitBox,
+            hurt_box: HitBox
+         });
                     
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
-        FighterMovementNode{
-            movement: FighterMovement::WalkingEast,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = WALKING_SPEED;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-            },
-            sprite_name: "Walking".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::WalkingEast,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = WALKING_SPEED;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //     },
+        //     sprite_name: "Walking".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
-        FighterMovementNode{
-            movement: FighterMovement::RunningEast,
-            player_can_enter: |floor_z,position_z,
-                                    fighter_movement_stack,
-                                    event_keyset_stack| {
-                let window_time = 0.3;
-                let cond1 = position_z == floor_z;
+        // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::RunningEast,
+        //     player_can_enter: |floor_z,position_z,
+        //                             fighter_movement_stack,
+        //                             event_keyset_stack| {
+        //         let window_time = 0.3;
+        //         let cond1 = position_z == floor_z;
 
-                //search for double pressed in window
-                let mut pressed = 0;
-                let mut elements = 0;
-                for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
-                    if timed_keyset.duration > window_time || pressed > 1 {break};
-                    if timed_keyset.value.contains(&KeyTarget::RightJustPressed) {pressed += 1};
-                    elements += 1;
-                }
-                let cond2 = pressed > 1;
+        //         //search for double pressed in window
+        //         let mut pressed = 0;
+        //         let mut elements = 0;
+        //         for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
+        //             if timed_keyset.duration > window_time || pressed > 1 {break};
+        //             if timed_keyset.value.contains(&KeyTarget::RightJustPressed) {pressed += 1};
+        //             elements += 1;
+        //         }
+        //         let cond2 = pressed > 1;
 
-                //make sure last movement is idle/walking
-                let mut cond3 = true;
-                if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
-                    if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingEast {
-                       cond3 = false;
-                    }
-                }
+        //         //make sure last movement is idle/walking
+        //         let mut cond3 = true;
+        //         if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
+        //             if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingEast {
+        //                cond3 = false;
+        //             }
+        //         }
 
-                let cond =cond1 & cond2 & cond3;
+        //         let cond =cond1 & cond2 & cond3;
 
-                //remove acted upon events from stack
-                if cond == true {
-                    for _ in 0..elements {
-                        event_keyset_stack.0.pop();
-                    }
-                }
+        //         //remove acted upon events from stack
+        //         if cond == true {
+        //             for _ in 0..elements {
+        //                 event_keyset_stack.0.pop();
+        //             }
+        //         }
 
-                cond
-                },
-            player_can_exit: |_, _, _, request| {
-                let unallowed_transitions = [
-                    FighterMovement::WalkingEast,
-                    FighterMovement::WalkingNorth,
-                    FighterMovement::WalkingSouth,
-                    FighterMovement::WalkingNorthEast,
-                    FighterMovement::WalkingSouthEast,
-                    FighterMovement::Idle,
-                ];
+        //         cond
+        //         },
+        //     player_can_exit: |_, _, _, request| {
+        //         let unallowed_transitions = [
+        //             FighterMovement::WalkingEast,
+        //             FighterMovement::WalkingNorth,
+        //             FighterMovement::WalkingSouth,
+        //             FighterMovement::WalkingNorthEast,
+        //             FighterMovement::WalkingSouthEast,
+        //             FighterMovement::Idle,
+        //         ];
 
-                for movement in unallowed_transitions {
-                    if request == &movement {return false};
-                }
-                return true;
-            },
-            enter: |_, fighter_velocity| {fighter_velocity.x = RUNNING_SPEED;},
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-            },
-            channel: Some(|full_keyset, fighter_velocity| {
-                if KeyTargetSet::from([KeyTarget::Up]).is_subset(full_keyset) {
-                    fighter_velocity.y = WALKING_SPEED;
-                }
-                if KeyTargetSet::from([KeyTarget::Down]).is_subset(full_keyset) {
-                    fighter_velocity.y = -WALKING_SPEED;
-                }
-            }),
-            sprite_name: "Running".to_string(),
-            ..default()}
-        );
+        //         for movement in unallowed_transitions {
+        //             if request == &movement {return false};
+        //         }
+        //         return true;
+        //     },
+        //     enter: |_, fighter_velocity| {fighter_velocity.x = RUNNING_SPEED;},
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //     },
+        //     channel: Some(|full_keyset, fighter_velocity| {
+        //         if KeyTargetSet::from([KeyTarget::Up]).is_subset(full_keyset) {
+        //             fighter_velocity.y = WALKING_SPEED;
+        //         }
+        //         if KeyTargetSet::from([KeyTarget::Down]).is_subset(full_keyset) {
+        //             fighter_velocity.y = -WALKING_SPEED;
+        //         }
+        //     }),
+        //     sprite_name: "Running".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed]),
-        FighterMovementNode{
-            movement: FighterMovement::JumpAttack,
-            enter: |_,_| {},
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-                fighter_position.z += fighter_velocity.z * delta_time;
-                fighter_velocity.z += GRAVITY * delta_time;
-            },
-            player_can_enter: |floor_z,position_z,
-                                    fighter_movement_stack,
-                                    _| {
+        // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::JumpAttack,
+        //     enter: |_,_| {},
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //         fighter_position.z += fighter_velocity.z * delta_time;
+        //         fighter_velocity.z += GRAVITY * delta_time;
+        //     },
+        //     player_can_enter: |floor_z,position_z,
+        //                             fighter_movement_stack,
+        //                             _| {
                                         
-                if floor_z == position_z {return false};
-                if let Some(last_durative_movement) = fighter_movement_stack.0.stack.last() {
-                    if last_durative_movement.value == FighterMovement::Jumping {return true};
-                }
-                return false;
-            },
-            sprite_name: "AirSlashing".to_string(),
-            ..default()}
-        );
+        //         if floor_z == position_z {return false};
+        //         if let Some(last_durative_movement) = fighter_movement_stack.0.stack.last() {
+        //             if last_durative_movement.value == FighterMovement::Jumping {return true};
+        //         }
+        //         return false;
+        //     },
+        //     sprite_name: "AirSlashing".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Left]),
-        FighterMovementNode{
-            movement: FighterMovement::WalkingWest,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = -WALKING_SPEED;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-            },
-            sprite_name: "Walking".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Left]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::WalkingWest,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = -WALKING_SPEED;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //     },
+        //     sprite_name: "Walking".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up]),
-        FighterMovementNode{
-            movement: FighterMovement::WalkingNorth,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.y = WALKING_SPEED;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.y += fighter_velocity.y * delta_time;
-            },
-            sprite_name: "Walking".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::WalkingNorth,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.y = WALKING_SPEED;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //     },
+        //     sprite_name: "Walking".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
-        FighterMovementNode{
-            movement: FighterMovement::WalkingSouth,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.y = -WALKING_SPEED;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.y += fighter_velocity.y * delta_time;
-            },
-            sprite_name: "Walking".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::WalkingSouth,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.y = -WALKING_SPEED;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //     },
+        //     sprite_name: "Walking".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right, KeyTarget::Up]),
-        FighterMovementNode{
-            movement: FighterMovement::WalkingNorthEast,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = WALKING_SPEED/1.41;
-                fighter_velocity.y = WALKING_SPEED/1.41;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-            },
-            sprite_name: "Walking".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right, KeyTarget::Up]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::WalkingNorthEast,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = WALKING_SPEED/1.41;
+        //         fighter_velocity.y = WALKING_SPEED/1.41;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //     },
+        //     sprite_name: "Walking".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up, KeyTarget::Left]),
-        FighterMovementNode{
-            movement: FighterMovement::WalkingNorthWest,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = -WALKING_SPEED/1.41;
-                fighter_velocity.y = WALKING_SPEED/1.41;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-            },
-            sprite_name: "Walking".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up, KeyTarget::Left]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::WalkingNorthWest,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = -WALKING_SPEED/1.41;
+        //         fighter_velocity.y = WALKING_SPEED/1.41;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //     },
+        //     sprite_name: "Walking".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down, KeyTarget::Right]),
-        FighterMovementNode{
-            movement: FighterMovement::WalkingSouthEast,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = WALKING_SPEED/1.41;
-                fighter_velocity.y = -WALKING_SPEED/1.41;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-            },
-            sprite_name: "Walking".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down, KeyTarget::Right]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::WalkingSouthEast,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = WALKING_SPEED/1.41;
+        //         fighter_velocity.y = -WALKING_SPEED/1.41;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //     },
+        //     sprite_name: "Walking".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down, KeyTarget::Left]),
-        FighterMovementNode{
-            movement: FighterMovement::WalkingSouthWest,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = -WALKING_SPEED/1.41;
-                fighter_velocity.y = -WALKING_SPEED/1.41;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-            },
-            sprite_name: "Walking".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down, KeyTarget::Left]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::WalkingSouthWest,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = -WALKING_SPEED/1.41;
+        //         fighter_velocity.y = -WALKING_SPEED/1.41;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //     },
+        //     sprite_name: "Walking".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::LeftJustPressed]),
-        FighterMovementNode{
-            movement: FighterMovement::RunningWest,
-            player_can_enter: |floor_z,position_z,
-                                     fighter_movement_stack,
-                                     event_keyset_stack| {
-                let window_time = 0.3;
-                let cond1 = position_z == floor_z;
+        // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::LeftJustPressed]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::RunningWest,
+        //     player_can_enter: |floor_z,position_z,
+        //                              fighter_movement_stack,
+        //                              event_keyset_stack| {
+        //         let window_time = 0.3;
+        //         let cond1 = position_z == floor_z;
 
-                //search for double pressed in window
-                let mut pressed = 0;
-                let mut elements = 0;
-                for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
-                    if timed_keyset.duration > window_time || pressed > 1 {break};
-                    if timed_keyset.value.contains(&KeyTarget::LeftJustPressed) {
-                        pressed += 1;
-                    }
-                    elements += 1;
-                }
-                let cond2 = pressed > 1;
+        //         //search for double pressed in window
+        //         let mut pressed = 0;
+        //         let mut elements = 0;
+        //         for timed_keyset in event_keyset_stack.0.stack.iter().rev() {
+        //             if timed_keyset.duration > window_time || pressed > 1 {break};
+        //             if timed_keyset.value.contains(&KeyTarget::LeftJustPressed) {
+        //                 pressed += 1;
+        //             }
+        //             elements += 1;
+        //         }
+        //         let cond2 = pressed > 1;
 
-                //make sure last movement is idle/walking
-                let mut cond3 = true;
-                if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
-                    if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingWest {
-                        cond3 = false;
-                    }
-                }
+        //         //make sure last movement is idle/walking
+        //         let mut cond3 = true;
+        //         if let Some(last_movement) = fighter_movement_stack.0.stack.last() {
+        //             if last_movement.value != FighterMovement::Idle && last_movement.value != FighterMovement::WalkingWest {
+        //                 cond3 = false;
+        //             }
+        //         }
 
-                let cond =cond1 & cond2 & cond3;
+        //         let cond =cond1 & cond2 & cond3;
 
-                //remove acted upon events from stack
-                if cond == true {
-                    for _ in 0..elements {
-                        event_keyset_stack.0.pop();
-                    }
-                }
+        //         //remove acted upon events from stack
+        //         if cond == true {
+        //             for _ in 0..elements {
+        //                 event_keyset_stack.0.pop();
+        //             }
+        //         }
 
-                cond
-            },
-            player_can_exit: |_, _, _, request| {
-                let unallowed_transitions = [
-                    FighterMovement::WalkingWest,
-                    FighterMovement::WalkingNorth,
-                    FighterMovement::WalkingSouth,
-                    FighterMovement::WalkingNorthWest,
-                    FighterMovement::WalkingSouthWest,
-                    FighterMovement::Idle,
-                ];
+        //         cond
+        //     },
+        //     player_can_exit: |_, _, _, request| {
+        //         let unallowed_transitions = [
+        //             FighterMovement::WalkingWest,
+        //             FighterMovement::WalkingNorth,
+        //             FighterMovement::WalkingSouth,
+        //             FighterMovement::WalkingNorthWest,
+        //             FighterMovement::WalkingSouthWest,
+        //             FighterMovement::Idle,
+        //         ];
 
-                for movement in unallowed_transitions {
-                    if request == &movement {return false};
-                }
-                return true;
-            },
-            enter: |_, fighter_velocity| {fighter_velocity.x = -RUNNING_SPEED;},
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-            },
-            channel: Some(|full_keyset, fighter_velocity| {
-                if KeyTargetSet::from([KeyTarget::Up]).is_subset(full_keyset) {
-                    fighter_velocity.y = WALKING_SPEED/2.0;
-                }
-                if KeyTargetSet::from([KeyTarget::Down]).is_subset(full_keyset) {
-                    fighter_velocity.y = -WALKING_SPEED/2.0;
-                }
-            }),
-            sprite_name: "Running".to_string(),
-            ..default()}
-        );
+        //         for movement in unallowed_transitions {
+        //             if request == &movement {return false};
+        //         }
+        //         return true;
+        //     },
+        //     enter: |_, fighter_velocity| {fighter_velocity.x = -RUNNING_SPEED;},
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //     },
+        //     channel: Some(|full_keyset, fighter_velocity| {
+        //         if KeyTargetSet::from([KeyTarget::Up]).is_subset(full_keyset) {
+        //             fighter_velocity.y = WALKING_SPEED/2.0;
+        //         }
+        //         if KeyTargetSet::from([KeyTarget::Down]).is_subset(full_keyset) {
+        //             fighter_velocity.y = -WALKING_SPEED/2.0;
+        //         }
+        //     }),
+        //     sprite_name: "Running".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Defend]),
-        FighterMovementNode{
-            movement: FighterMovement::Docking,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = 0.0;
-                fighter_velocity.y = 0.0;
-            },
-            sprite_name: "Sliding".to_string(),
-            ..default()}
-        );
+        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Defend]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::Docking,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = 0.0;
+        //         fighter_velocity.y = 0.0;
+        //     },
+        //     sprite_name: "Sliding".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::JumpJustPressed]),
-        FighterMovementNode{
-            movement: FighterMovement::Jumping,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.z = JUMPING_SPEED;
-            },
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-                fighter_position.z += fighter_velocity.z * delta_time;
-                fighter_velocity.z += GRAVITY * delta_time;
-            },
-            player_can_exit: |floor_z,position_z,_,request| 
-                {
-                    if request == &FighterMovement::JumpAttack {
-                        return true
-                    } else if position_z == floor_z {
-                        return true}
-                    else {
-                        return false};
-                },
+        // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::JumpJustPressed]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::Jumping,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.z = JUMPING_SPEED;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //         fighter_position.z += fighter_velocity.z * delta_time;
+        //         fighter_velocity.z += GRAVITY * delta_time;
+        //     },
+        //     player_can_exit: |floor_z,position_z,_,request| 
+        //         {
+        //             if request == &FighterMovement::JumpAttack {
+        //                 return true
+        //             } else if position_z == floor_z {
+        //                 return true}
+        //             else {
+        //                 return false};
+        //         },
                 
-            sprite_name: "JumpLoop".to_string(),
-            ..default()}
-        );
+        //     sprite_name: "JumpLoop".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed, KeyTarget::DefendJustPressed]),
-        FighterMovementNode{
-            movement: FighterMovement::Slashing,
-            enter: |_, fighter_velocity| {
-                fighter_velocity.x = 0.0;
-                fighter_velocity.y = 0.0;
-            },
-            player_can_exit: |floor_z, position_z,movement_duration,_| 
-                floor_z == position_z && movement_duration > 0.5,
-            sprite_name: "Slashing".to_string(),
-            ..default()}
-        );
+        // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed, KeyTarget::DefendJustPressed]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::Slashing,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.x = 0.0;
+        //         fighter_velocity.y = 0.0;
+        //     },
+        //     player_can_exit: |floor_z, position_z,movement_duration,_| 
+        //         floor_z == position_z && movement_duration > 0.5,
+        //     sprite_name: "Slashing".to_string(),
+        //     ..default()}
+        // );
 
-        map.insert_to_movement_map(
-        FighterMovementNode{
-            movement: FighterMovement::InAir,
-            update: |fighter_position, fighter_velocity, delta_time| {
-                fighter_position.x += fighter_velocity.x * delta_time;
-                fighter_position.y += fighter_velocity.y * delta_time;
-                fighter_position.z += fighter_velocity.z * delta_time;
-                fighter_velocity.z += GRAVITY * delta_time;
-            },
-            sprite_name: "JumpLoop".to_string(),
-            ..default()}
-        );
+        // map.insert_to_movement_map(
+        // FighterMovementNode{
+        //     movement: FighterMovement::InAir,
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //         fighter_position.z += fighter_velocity.z * delta_time;
+        //         fighter_velocity.z += GRAVITY * delta_time;
+        //     },
+        //     sprite_name: "JumpLoop".to_string(),
+        //     ..default()}
+        // );
 
         map
     }
