@@ -87,75 +87,99 @@ impl FighterMovementStack {
 }
 pub struct HitBox;
 
-pub struct FighterMovementNode {
+pub struct FighterMovementNodeBase {
     pub movement: FighterMovement,
-    player_can_enter : fn(floor_z : f32,
-                                    position_z : f32,
-                                    fighter_movement_stack : &FighterMovementStack,
-                                    keyset : &mut KeyTargetSetStack) -> bool,
-    player_can_exit : fn(floor_z : f32,
-                                    position_z : f32,
-                                    movement_duration : f32,
-                                    movement_request : &FighterMovement) -> bool,
-    pub hit_boxes : Vec<HitBox>,
-    pub hurt_boxes : Vec<HitBox>,
-    update : fn(fighter_position : &mut FighterPosition,
+    pub sprite_name : String,
+    state_update : fn(fighter_position : &mut FighterPosition,
                     fighter_velocity : &mut FighterVelocity,
                     delta_time : f32),
-    enter : fn(fighter_position : &mut FighterPosition,
+    state_enter : fn(fighter_position : &mut FighterPosition,
                    fighter_velocity : &mut FighterVelocity),
-    pub channel : Option<fn (full_keyset : &KeyTargetSet, fighter_velocity : &mut FighterVelocity)>,
-    pub sprite_name : String,
 }
 
-impl FighterMovementNode {
-    pub fn player_can_enter(&self, floor_z : f32,
-                                        position_z : f32,
-                                        fighter_movement_stack : &FighterMovementStack,
-                                        keyset_stack :&mut KeyTargetSetStack) -> bool {
-        (self.player_can_enter)(floor_z, position_z, fighter_movement_stack,keyset_stack)
-    }
-    pub fn player_can_exit(&self, floor_z :f32,
-                                        position_z : f32,
-                                        movement_duration : f32,
-                                        movement_request : &FighterMovement) -> bool {
-        (self.player_can_exit)(floor_z, position_z, movement_duration, movement_request)
-    }
-    pub fn update(&self, fighter_position : &mut FighterPosition,
-                         fighter_velocity : &mut FighterVelocity,
-                         delta_time : f32) {
-        (self.update)(fighter_position, fighter_velocity, delta_time);
-    }
-    pub fn enter(&self, fighter_position : &mut FighterPosition,
-                        fighter_velocity : &mut FighterVelocity) {
-        (self.enter)(fighter_position, fighter_velocity);
-    }
-}
-
-impl Default for FighterMovementNode {
+impl Default for FighterMovementNodeBase {
     fn default() -> Self {
-        Self{
-            movement: FighterMovement::Idle,
-            enter: |_fighter_position, fighter_velocity| {
-                fighter_velocity.x = 0.0;
-                fighter_velocity.y = 0.0;
-            },
-            update: |_,_,_| {},
-            channel: None,
-            player_can_enter: |floor_z,position_z,_,_| position_z == floor_z,
-            player_can_exit: |floor_z,position_z,_,_| position_z == floor_z,
-            hit_boxes: Vec::new(),
-            hurt_boxes: Vec::new(),
+        Self { movement: FighterMovement::Idle,
             sprite_name: "Idle".to_string(),
+            state_update: |_,_,_| {},
+            state_enter: |_,_| {},
         }
     }
 }
 
-//A static graph of all possible movements for a fighter. NO DYNAMIC DATA.
+pub struct EventFighterMovementNode {
+    pub base : FighterMovementNodeBase,
+    player_can_enter : fn(floor_z : f32,
+        position_z : f32,
+        fighter_movement_stack : &FighterMovementStack,
+        keyset : &mut KeyTargetSetStack) -> bool,
+    player_can_exit : fn(floor_z : f32,
+            position_z : f32,
+            movement_duration : f32,
+            movement_request : &FighterMovement) -> bool,
+    pub channel : Option<fn (full_keyset : &KeyTargetSet, fighter_velocity : &mut FighterVelocity)>,
+    pub duration : usize,
+    pub hit_boxes : Vec<HitBox>,
+    pub hurt_boxes : Vec<HitBox>,
+}
+
+impl Default for EventFighterMovementNode {
+    fn default() -> Self {
+        Self {player_can_enter: |_,_,_,_| false,
+                player_can_exit: |_,_,_,_| false,
+                channel: None,
+                duration: 0,
+                ..default()
+             }
+    }
+}
+
+pub struct PersistentFighterMovementNode {
+    pub base : FighterMovementNodeBase,
+    player_can_enter : fn(floor_z : f32,
+        position_z : f32,
+        fighter_movement_stack : &FighterMovementStack,
+        keyset : &mut KeyTargetSetStack) -> bool,
+    player_can_exit : fn(floor_z : f32,
+            position_z : f32,
+            movement_duration : f32,
+            movement_request : &FighterMovement) -> bool,
+    pub hit_box : HitBox,
+    pub hurt_box : HitBox,
+}
+
+impl Default for PersistentFighterMovementNode {
+    fn default() -> Self {
+        Self {
+                ..default()
+             }
+    }
+}
+
+pub struct UncontrollableFighterMovementNode {
+    pub base : FighterMovementNodeBase,
+    pub hit_box : HitBox,
+    pub hurt_box : HitBox,
+}
+
+impl Default for UncontrollableFighterMovementNode {
+    fn default() -> Self {
+        Self {
+                ..default()
+             }
+    }
+}
+
+enum FighterMovementNode {
+    EventTriggered(Arc<EventFighterMovementNode>),
+    Persistent(Arc<PersistentFighterMovementNode>),
+    Uncontrollable(Arc<UncontrollableFighterMovementNode>),
+}
 pub struct FighterMovementMap {
-    pub event_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
-    pub persistent_map : HashMap<KeyTargetSet,Arc<FighterMovementNode>>,
-    pub movement_map : HashMap<FighterMovement, Arc<FighterMovementNode>>,
+    pub event_map : HashMap<KeyTargetSet,Arc<EventFighterMovementNode>>,
+    pub persistent_map : HashMap<KeyTargetSet,Arc<PersistentFighterMovementNode>>,
+    pub uncontrollable_map : HashMap<FighterMovement,Arc<UncontrollableFighterMovementNode>>,
+    pub movement_map : HashMap<FighterMovement, FighterMovementNode>,
 }
 
 impl FighterMovementMap {
@@ -163,12 +187,42 @@ impl FighterMovementMap {
         Self{
             event_map : HashMap::new(),
             persistent_map : HashMap::new(),
+            uncontrollable_map : HashMap::new(),
             movement_map : HashMap::new(),
         }
     }
 
-    pub fn get(&self, movement: &FighterMovement) -> &FighterMovementNode {
-        self.movement_map.get(movement).unwrap().as_ref()
+    pub fn get_event(&self, movement: &FighterMovement) -> Option<Arc<EventFighterMovementNode>> {
+        self.movement_map.get(movement)
+            .and_then(|node| {
+                if let FighterMovementNode::EventTriggered(arc) = node {
+                    Some(Arc::clone(arc))
+                } else {
+                    None
+                }
+            })
+    }
+
+    pub fn get_persistent(&self, movement: &FighterMovement) -> Option<Arc<PersistentFighterMovementNode>> {
+        self.movement_map.get(movement)
+            .and_then(|node| {
+                if let FighterMovementNode::Persistent(arc) = node {
+                    Some(Arc::clone(arc))
+                } else {
+                    None
+                }
+            })
+    }
+
+    pub fn get_uncontrollable(&self, movement: &FighterMovement) -> Option<Arc<UncontrollableFighterMovementNode>> {
+        self.movement_map.get(movement)
+            .and_then(|node| {
+                if let FighterMovementNode::Uncontrollable(arc) = node {
+                    Some(Arc::clone(arc))
+                } else {
+                    None
+                }
+            })
     }
 
     fn ensure_must_exists_movements(self) -> Self{
@@ -181,43 +235,39 @@ impl FighterMovementMap {
     self
     }
 
-    fn check_if_can_insert_node(&mut self, keyset : &KeyTargetSet, node : &FighterMovementNode) {
+    fn check_if_can_insert_node(&mut self, keyset : &KeyTargetSet, movement : &FighterMovement) {
         if self.event_map.contains_key(&keyset) {
             panic!("Keyset {:?} already contained in event_map", keyset);
         } else if self.persistent_map.contains_key(keyset) {
             panic!("Keyset {:?} already contained in the persistent_map", keyset);
-        } else if {
-            self.movement_map.contains_key(&node.movement)
-        } {
-            panic!("Node with fighter movment {} already contained in the movement_map", node.movement);
+        } else if self.uncontrollable_map.contains_key(&movement) {
+            panic!("Node with fighter movement {} already contained in the uncontrollable_map", movement);
+        } else if self.movement_map.contains_key(&movement) {
+            panic!("Node with fighter movement {} already contained in the movement_map", movement);
         }
     }
 
-    pub fn insert_to_event_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
-        self.check_if_can_insert_node(&keyset, &node);
-        let node_name = node.movement.clone();
+    pub fn insert_to_event_map(&mut self, keyset : KeyTargetSet, node : EventFighterMovementNode) {
+        self.check_if_can_insert_node(&keyset, &node.base.movement);
+        let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
-        self.movement_map.insert(node_name, arc_movement_node.clone());
+        self.movement_map.insert(node_movement, FighterMovementNode::EventTriggered(arc_movement_node.clone()));
         self.event_map.insert(keyset, arc_movement_node);
     }
 
-    pub fn insert_to_peristent_map(&mut self, keyset : KeyTargetSet, node : FighterMovementNode) {
-        self.check_if_can_insert_node(&keyset, &node);
-        let node_name = node.movement.clone();
+    pub fn insert_to_persistent_map(&mut self, keyset : KeyTargetSet, node : PersistentFighterMovementNode) {
+        self.check_if_can_insert_node(&keyset, &node.base.movement);
+        let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
-        self.movement_map.insert(node_name, arc_movement_node.clone());
+        self.movement_map.insert(node_movement, FighterMovementNode::Persistent(arc_movement_node.clone()));
         self.persistent_map.insert(keyset, arc_movement_node);
     }
 
-    //by_name map may contain nodes that are not in the keyset_map
-    pub fn insert_to_movement_map(&mut self, node : FighterMovementNode) {
-        if self.movement_map.contains_key(&node.movement) {
-            panic!("node with that name {} already exists in the map", &node.movement);
-        } else {
-        let node_name = node.movement.clone();
+    pub fn insert_to_uncontrollable_map(&mut self, node : UncontrollableFighterMovementNode) {
+        let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
-        self.movement_map.insert(node_name, arc_movement_node.clone());
-        }
+        self.movement_map.insert(node_movement, FighterMovementNode::Uncontrollable(arc_movement_node.clone()));
+        self.uncontrollable_map.insert(node.base.movement, arc_movement_node);
     }
 }
 
@@ -312,10 +362,12 @@ impl Default for FighterMovementMap {
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed]),
         FighterMovementNode{
             movement: FighterMovement::JumpAttack,
+            enter: |_,_| {},
             update: |fighter_position, fighter_velocity, delta_time| {
                 fighter_position.x += fighter_velocity.x * delta_time;
                 fighter_position.y += fighter_velocity.y * delta_time;
                 fighter_position.z += fighter_velocity.z * delta_time;
+                fighter_velocity.z += GRAVITY * delta_time;
             },
             player_can_enter: |floor_z,position_z,
                                     fighter_movement_stack,

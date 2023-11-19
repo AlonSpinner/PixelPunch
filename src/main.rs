@@ -303,6 +303,7 @@ fn player_control(mut query: Query<(&Fighter,
         let joined_event_keytargetset = event_keytargetset_stack.join();
         let inner_event_keytargetset_stack = event_keytargetset_stack.into_inner();
 
+        //exit event if it is over
 
         //try new event movement
         if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
