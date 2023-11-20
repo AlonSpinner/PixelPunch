@@ -1,11 +1,15 @@
-pub struct TimeTaggedValue<T> {
+#[derive(Clone)]
+pub struct TimeTaggedValue<T> 
+where
+T : Clone,
+{
     pub value : T,
     pub duration : f32,
 }
 
 pub struct TimeTaggedStack<T>
 where
-T: std::fmt::Debug, 
+T: std::fmt::Debug + Clone,
 {
     pub stack : Vec<TimeTaggedValue<T>>,
     pub max_size : usize,
@@ -13,7 +17,7 @@ T: std::fmt::Debug,
 
 impl<T> TimeTaggedStack<T>
 where
-T : std::fmt::Debug, 
+T : std::fmt::Debug + Clone,
 {
     pub fn new(max_size : usize) -> Self {
         Self{
@@ -41,9 +45,10 @@ T : std::fmt::Debug,
 }
 
 
+//like time tagged stack but with max_duration
 pub struct DurativeStack<T>
 where
-T: std::fmt::Debug, 
+T: std::fmt::Debug + Clone, 
 {
     pub stack : Vec<TimeTaggedValue<T>>,
     pub max_size : usize,
@@ -52,7 +57,7 @@ T: std::fmt::Debug,
 
 impl<T> DurativeStack<T>
 where
-T : std::fmt::Debug, 
+T : std::fmt::Debug + Clone, 
 {
     pub fn new(max_size : usize, max_duration : f32) -> Self {
         Self{

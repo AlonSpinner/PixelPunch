@@ -296,7 +296,8 @@ fn player_control(mut query: Query<(&Fighter,
         event_keytargetset_stack.0.update(time.delta_seconds());
         movement_stack.0.update(time.delta_seconds());
 
-        let last_durative_movement : &TimeTaggedValue<FighterMovement> = movement_stack.last_value().unwrap();
+        let last_durative_movement = movement_stack.last_value()
+            .expect("movement_stack is empty").clone();
         let last_movement_node = fighter_map
                 .get_node_by_movement(&last_durative_movement.value)
                 .expect("Failed to get last movement node");
@@ -323,8 +324,8 @@ fn player_control(mut query: Query<(&Fighter,
         
         //try peristent movement
         if let Some(movement_nodes) = fighter_map.persistent_map.get(&persistent_keytargetset) {
-            for movement_node in movement_nodes {
-                if movement_node.base.movement == last_durative_movement.value {continue}; //no channeled persistent movements be design
+            let filtered_nodes = movement_nodes.iter().filter(|movement_node| {
+                // if movement_node.base.movement == last_durative_movement.value {continue}; //no channeled persistent movements be design
                 let can_enter = (movement_node.player_can_enter)(FLOOR_Z, position.z);
 
                 let can_exit = match last_movement_node {
@@ -337,14 +338,24 @@ fn player_control(mut query: Query<(&Fighter,
                     FighterMovementNode::Uncontrollable(_) => true,
                 };
 
-                if can_enter && can_exit {
-                    movement_stack.push(movement_node.base.movement);
-                    (movement_node.base.state_enter)(&mut position, &mut velocity);
-                    continue
+                can_enter & can_exit
+                }).collect::<Vec<_>>();
+
+            match filtered_nodes.len() {
+                0 => (),
+                1 => {
+                    let new_movement_node = filtered_nodes[0];
+                    movement_stack.push(new_movement_node.base.movement);
+                    (new_movement_node.base.state_enter)(&mut position, &mut velocity);
                 }
-            continue
+                _ => {
+                    let culprit_movements = filtered_nodes.iter()
+                                .map(|x| x.base.movement)
+                                .collect::<Vec<_>>();
+                    panic!("two or more persistent movements. the culprits are {:#?}", culprit_movements)
+                },   
             }
-        } 
+        }
         
         // try to enter idle
         if last_durative_movement.value != FighterMovement::Idle {
