@@ -180,7 +180,7 @@ impl FighterMovementNode {
         state_update_fn(pos,vel,dt);
     }
 
-    pub fn state_enter(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity, dt : f32) {
+    pub fn state_enter(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity) {
         let state_update_fn = match self {
             FighterMovementNode::EventTriggered(node) => {&node.base.state_enter},
             FighterMovementNode::Persistent(node) => {&node.base.state_enter},
@@ -251,20 +251,14 @@ impl FighterMovementMap {
     self
     }
 
-    fn check_if_can_insert_node(&mut self, keyset : &KeyTargetSet, movement : &FighterMovement) {
-        if self.event_map.contains_key(&keyset) {
-            panic!("Keyset {:?} already contained in event_map", keyset);
-        } else if self.persistent_map.contains_key(keyset) {
-            panic!("Keyset {:?} already contained in the persistent_map", keyset);
-        } else if self.uncontrollable_map.contains_key(&movement) {
-            panic!("Node with fighter movement {} already contained in the uncontrollable_map", movement);
-        } else if self.movement_map.contains_key(&movement) {
+    fn check_if_can_insert_node(&mut self, movement : &FighterMovement) {
+        if self.movement_map.contains_key(&movement) {
             panic!("Node with fighter movement {} already contained in the movement_map", movement);
         }
     }
 
     pub fn insert_to_event_map(&mut self, keyset : KeyTargetSet, node : EventFighterMovementNode) {
-        self.check_if_can_insert_node(&keyset, &node.base.movement);
+        self.check_if_can_insert_node(&node.base.movement);
         let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.movement_map.insert(node_movement, FighterMovementNode::EventTriggered(arc_movement_node.clone()));
@@ -272,7 +266,7 @@ impl FighterMovementMap {
     }
 
     pub fn insert_to_persistent_map(&mut self, keyset : KeyTargetSet, node : PersistentFighterMovementNode) {
-        self.check_if_can_insert_node(&keyset, &node.base.movement);
+        self.check_if_can_insert_node(&node.base.movement);
         let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.movement_map.insert(node_movement, FighterMovementNode::Persistent(arc_movement_node.clone()));
@@ -280,6 +274,7 @@ impl FighterMovementMap {
     }
 
     pub fn insert_to_uncontrollable_map(&mut self, node : UncontrollableFighterMovementNode) {
+        self.check_if_can_insert_node(&node.base.movement);
         let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.movement_map.insert(node_movement, FighterMovementNode::Uncontrollable(arc_movement_node.clone()));
@@ -299,7 +294,23 @@ impl Default for FighterMovementMap {
             },
             hit_box: HitBox,
             hurt_box: HitBox
-         });
+        });
+
+         map.insert_to_uncontrollable_map(UncontrollableFighterMovementNode {
+             base: FighterMovementNodeBase { 
+                 movement: FighterMovement::InAir,
+                 sprite_name: "JumpLoop".to_string(),
+                 state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                    pos.y += vel.y*dt;
+                    pos.z += vel.z*dt;
+                    vel.z += GRAVITY*dt;
+                 },
+                 state_enter: |_,_| {}, 
+             },
+             hit_box: HitBox,
+             hurt_box: HitBox
+        });
                     
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Right]),
         PersistentFighterMovementNode { 
@@ -384,6 +395,7 @@ impl Default for FighterMovementMap {
                 sprite_name: "Walking".to_string(),
                 state_update: |pos,vel,dt| {
                     pos.x += vel.x*dt;
+                    pos.y += vel.y*dt;
                 },
                 state_enter: |_,vel| {
                     vel.x = WALKING_SPEED/1.41;
@@ -403,6 +415,7 @@ impl Default for FighterMovementMap {
                 sprite_name: "Walking".to_string(),
                 state_update: |pos,vel,dt| {
                     pos.x += vel.x*dt;
+                    pos.y += vel.y*dt;
                 },
                 state_enter: |_,vel| {
                     vel.x = -WALKING_SPEED/1.41;
@@ -422,6 +435,7 @@ impl Default for FighterMovementMap {
                 sprite_name: "Walking".to_string(),
                 state_update: |pos,vel,dt| {
                     pos.x += vel.x*dt;
+                    pos.y += vel.y*dt;
                 },
                 state_enter: |_,vel| {
                     vel.x = WALKING_SPEED/1.41;
@@ -441,6 +455,7 @@ impl Default for FighterMovementMap {
                 sprite_name: "Walking".to_string(),
                 state_update: |pos,vel,dt| {
                     pos.x += vel.x*dt;
+                    pos.y += vel.y*dt;
                 },
                 state_enter: |_,vel| {
                     vel.x = -WALKING_SPEED/1.41;
