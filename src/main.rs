@@ -131,9 +131,9 @@ fn load_assets(mut commands: Commands,
     for fighter in FIGHTERS {
         let fighter_movement_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
-        for sprite_name in fighter_movement_graph.movement_map.values().map(|x| x.sprite_name.clone()) {
+        for sprite_name in fighter_movement_graph.movement_map.values().map(|x| x.sprite_name()) {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
-            let path = PathBuf::from("textures").join(fighter.to_string()).join(&sprite_name);
+            let path = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name);
             let untyped_handles = asset_server.load_folder(path).unwrap();
             for handle in untyped_handles.iter() {
                 let image_handle = handle.clone().typed();
@@ -297,69 +297,68 @@ fn player_control(mut query: Query<(&Fighter,
         event_keytargetset_stack.0.update(time.delta_seconds());
         movement_stack.0.update(time.delta_seconds());
         let last_durative_movement = movement_stack.0.stack.last().unwrap();
-        let last_movement_node = fighter_map.get(&last_durative_movement.value);
 
         event_keytargetset_stack.0.push(event_keytargetset);
         let joined_event_keytargetset = event_keytargetset_stack.join();
         let inner_event_keytargetset_stack = event_keytargetset_stack.into_inner();
 
-        //exit event if it is over
+        let last_movement_node = fighter_map.get(&last_durative_movement.value).unwrap();
 
-        //try new event movement
-        if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
-            let cond1 = 
-                movement_node.player_can_enter(FLOOR_Z, position.z,
-                     &movement_stack, inner_event_keytargetset_stack);
-            let cond2 = last_movement_node.player_can_exit(FLOOR_Z, position.z,
-                     last_durative_movement.duration,
-                      &movement_node.movement);
-            if cond1 && cond2 {
-                movement_stack.0.push(movement_node.movement);
-                fighter_map.get(&movement_node.movement).enter(
-                    &mut position, &mut velocity);
-                continue
-            }
-        }
+
+        // //try new event movement
+        // if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
+        //     let cond1 = 
+        //         movement_node.player_can_enter(FLOOR_Z, position.z,
+        //              &movement_stack, inner_event_keytargetset_stack);
+        //     let cond2 = last_movement_node.player_can_exit(FLOOR_Z, position.z,
+        //              last_durative_movement.duration,
+        //               &movement_node.movement);
+        //     if cond1 && cond2 {
+        //         movement_stack.0.push(movement_node.movement);
+        //         fighter_map.get(&movement_node.movement).enter(
+        //             &mut position, &mut velocity);
+        //         continue
+        //     }
+        // }
         
         //try peristent movement
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
-            let ongoing_movement = movement_node.movement == last_durative_movement.value;
+            let ongoing_movement = movement_node.base.movement == last_durative_movement.value;
             if ongoing_movement {continue}; //no channeled persistent movements be design
             let new_movement = 
                 !ongoing_movement &&
-                movement_node.player_can_enter(FLOOR_Z, position.z,
-                     &movement_stack, inner_event_keytargetset_stack) &&
-                last_movement_node.player_can_exit(FLOOR_Z, position.z,
-                     last_durative_movement.duration,
-                      &movement_node.movement);
+                (movement_node.player_can_enter)(FLOOR_Z, position.z);
+
+                // last_movement_node.player_can_exit(FLOOR_Z, position.z,
+                //      last_durative_movement.duration,
+                //       &movement_node.movement);
             if new_movement {
-                movement_stack.0.push(movement_node.movement);
-                fighter_map.get(&movement_node.movement).enter(
-                    &mut position, &mut velocity);
+                movement_stack.0.push(movement_node.base.movement);
+                (movement_node.base.state_enter)(&mut position, &mut velocity);
                 continue
             }
         } 
         
         //try to enter idle
-        if last_durative_movement.value != FighterMovement::Idle {
-            let cond1 = fighter_map.get(&FighterMovement::Idle).player_can_enter(FLOOR_Z, position.z,
-                &movement_stack, inner_event_keytargetset_stack);
-            let cond2 = last_movement_node.player_can_exit(FLOOR_Z, position.z,
-                    last_durative_movement.duration,
-                     &FighterMovement::Idle);
-            if cond1 && cond2 {
-                movement_stack.0.push(FighterMovement::Idle);
-                fighter_map.get(&FighterMovement::Idle).enter(
-                                &mut position, &mut velocity);
-                continue
-            }
-        }
+        // if last_durative_movement.value != FighterMovement::Idle {
+        //     let cond1 = fighter_map.get(&FighterMovement::Idle).player_can_enter(FLOOR_Z, position.z,
+        //         &movement_stack, inner_event_keytargetset_stack);
+        //     let cond2 = last_movement_node.player_can_exit(FLOOR_Z, position.z,
+        //             last_durative_movement.duration,
+        //              &FighterMovement::Idle);
+        //     if cond1 && cond2 {
+        //         movement_stack.0.push(FighterMovement::Idle);
+        //         fighter_map.get(&FighterMovement::Idle).enter(
+        //                         &mut position, &mut velocity);
+        //         continue
+        //     }
+        // }
 
-        //try to channel
-        let full_keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
-        if let Some(channel) = last_movement_node.channel {
-            channel(&full_keytargetset ,&mut velocity)
-        }
+        // //try to channel
+        // let full_keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
+        // if let Some(channel) = last_movement_node.channel {
+        //     channel(&full_keytargetset ,&mut velocity)
+        // }
     }  
 }
 fn update_state(mut query: Query<(&Fighter,
@@ -376,8 +375,8 @@ fn update_state(mut query: Query<(&Fighter,
 
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         if let Some(last_durative_movement) = movement_stack.0.stack.last() {
-            let movement_node = fighter_map.get(&last_durative_movement.value);
-            movement_node.update(&mut position, &mut velocity, dt);
+            let movement_node = fighter_map.get(&last_durative_movement.value).unwrap();
+            movement_node.state_update(&mut position, &mut velocity, dt);
             position.x = position.x.clamp(WEST_WALL_X,EAST_WALL_X);
             position.y = position.y.clamp(SOUTH_WALL_Y, NORTH_WALL_Y);
             position.z = position.z.clamp(FLOOR_Z, CEILING_Z);
@@ -405,8 +404,8 @@ fn draw_fighters(time: Res<Time>,
         
         if let Some(last_durative_movement) = movement_stack.0.stack.last() {
             let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap()
-                                                                .get(&last_durative_movement.value);
-            let sprite_name = &movement_node.sprite_name;
+                                                                .get(&last_durative_movement.value).unwrap();
+            let sprite_name = movement_node.sprite_name();
 
             if animation_timer.just_finished() {
                 let movement_indicies = fighters_movement_animation_indicies.0.get(&fighter).unwrap()

@@ -90,10 +90,10 @@ pub struct HitBox;
 pub struct FighterMovementNodeBase {
     pub movement: FighterMovement,
     pub sprite_name : String,
-    state_update : fn(fighter_position : &mut FighterPosition,
+    pub state_update : fn(fighter_position : &mut FighterPosition,
                     fighter_velocity : &mut FighterVelocity,
                     delta_time : f32),
-    state_enter : fn(fighter_position : &mut FighterPosition,
+    pub state_enter : fn(fighter_position : &mut FighterPosition,
                    fighter_velocity : &mut FighterVelocity),
 }
 
@@ -109,11 +109,11 @@ impl Default for FighterMovementNodeBase {
 
 pub struct EventFighterMovementNode {
     pub base : FighterMovementNodeBase,
-    player_can_enter : fn(floor_z : f32,
+    pub player_can_enter : fn(floor_z : f32,
         position_z : f32,
         fighter_movement_stack : &FighterMovementStack,
         keyset : &mut KeyTargetSetStack) -> bool,
-    player_can_exit : fn(floor_z : f32,
+    pub player_can_exit : fn(floor_z : f32,
             position_z : f32,
             movement_duration : f32,
             movement_request : &FighterMovement) -> bool,
@@ -123,37 +123,16 @@ pub struct EventFighterMovementNode {
     pub hurt_boxes : Vec<HitBox>,
 }
 
-impl Default for EventFighterMovementNode {
-    fn default() -> Self {
-        Self {player_can_enter: |_,_,_,_| false,
-                player_can_exit: |_,_,_,_| false,
-                channel: None,
-                duration: 0,
-                ..default()
-             }
-    }
-}
-
 pub struct PersistentFighterMovementNode {
     pub base : FighterMovementNodeBase,
-    player_can_enter : fn(floor_z : f32,
-        position_z : f32,
-        fighter_movement_stack : &FighterMovementStack,
-        keyset : &mut KeyTargetSetStack) -> bool,
-    player_can_exit : fn(floor_z : f32,
+    pub player_can_enter : fn(floor_z : f32,
+        position_z : f32,) -> bool,
+    pub player_can_exit : fn(floor_z : f32,
             position_z : f32,
             movement_duration : f32,
             movement_request : &FighterMovement) -> bool,
     pub hit_box : HitBox,
     pub hurt_box : HitBox,
-}
-
-impl Default for PersistentFighterMovementNode {
-    fn default() -> Self {
-        Self {
-                ..default()
-             }
-    }
 }
 
 pub struct UncontrollableFighterMovementNode {
@@ -170,16 +149,50 @@ impl Default for UncontrollableFighterMovementNode {
     }
 }
 
-enum FighterMovementNode {
+pub enum FighterMovementNode {
     EventTriggered(Arc<EventFighterMovementNode>),
     Persistent(Arc<PersistentFighterMovementNode>),
     Uncontrollable(Arc<UncontrollableFighterMovementNode>),
 }
+
 pub struct FighterMovementMap {
     pub event_map : HashMap<KeyTargetSet,Arc<EventFighterMovementNode>>,
     pub persistent_map : HashMap<KeyTargetSet,Arc<PersistentFighterMovementNode>>,
     pub uncontrollable_map : HashMap<FighterMovement,Arc<UncontrollableFighterMovementNode>>,
     pub movement_map : HashMap<FighterMovement, FighterMovementNode>,
+}
+
+impl FighterMovementNode {
+    pub fn sprite_name(&self) -> &String {
+        match self {
+            FighterMovementNode::EventTriggered(node) => {&node.base.sprite_name},
+            FighterMovementNode::Persistent(node) => {&node.base.sprite_name},
+            FighterMovementNode::Uncontrollable(node) => {&node.base.sprite_name},
+        }
+    }
+
+    pub fn state_update(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity, dt : f32) {
+        let state_update_fn = match self {
+            FighterMovementNode::EventTriggered(node) => {&node.base.state_update},
+            FighterMovementNode::Persistent(node) => {&node.base.state_update},
+            FighterMovementNode::Uncontrollable(node) => {&node.base.state_update},
+        };
+        state_update_fn(pos,vel,dt);
+    }
+
+    pub fn state_enter(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity, dt : f32) {
+        let state_update_fn = match self {
+            FighterMovementNode::EventTriggered(node) => {&node.base.state_enter},
+            FighterMovementNode::Persistent(node) => {&node.base.state_enter},
+            FighterMovementNode::Uncontrollable(node) => {&node.base.state_enter},
+        };
+        state_update_fn(pos,vel);
+    }
+}
+
+#[derive(Debug)]
+pub enum FighterMovementError {
+    MovementNotFound(FighterMovement),
 }
 
 impl FighterMovementMap {
@@ -192,18 +205,21 @@ impl FighterMovementMap {
         }
     }
 
-    pub fn get_event(&self, movement: &FighterMovement) -> Option<Arc<EventFighterMovementNode>> {
-        self.movement_map.get(movement)
-            .and_then(|node| {
-                if let FighterMovementNode::EventTriggered(arc) = node {
-                    Some(Arc::clone(arc))
-                } else {
-                    None
-                }
-            })
+    pub fn get(&self, movement: &FighterMovement) -> Result<&FighterMovementNode,FighterMovementError> {
+        self.movement_map.get(movement).ok_or(FighterMovementError::MovementNotFound(movement.clone()))
     }
 
-    pub fn get_persistent(&self, movement: &FighterMovement) -> Option<Arc<PersistentFighterMovementNode>> {
+    pub fn get_event(&self, movement: &FighterMovement) -> Result<Arc<EventFighterMovementNode>,FighterMovementError> {
+        self.movement_map.get(movement).and_then(|node| {
+            if let FighterMovementNode::EventTriggered(arc) = node {
+                Some(Arc::clone(arc))
+            } else { 
+                None
+            }
+        }).ok_or(FighterMovementError::MovementNotFound(movement.clone()))
+    }
+
+    pub fn get_persistent(&self, movement: &FighterMovement) -> Result<Arc<PersistentFighterMovementNode>,FighterMovementError> {
         self.movement_map.get(movement)
             .and_then(|node| {
                 if let FighterMovementNode::Persistent(arc) = node {
@@ -211,10 +227,10 @@ impl FighterMovementMap {
                 } else {
                     None
                 }
-            })
+            }).ok_or(FighterMovementError::MovementNotFound(movement.clone()))
     }
 
-    pub fn get_uncontrollable(&self, movement: &FighterMovement) -> Option<Arc<UncontrollableFighterMovementNode>> {
+    pub fn get_uncontrollable(&self, movement: &FighterMovement) -> Result<Arc<UncontrollableFighterMovementNode>,FighterMovementError> {
         self.movement_map.get(movement)
             .and_then(|node| {
                 if let FighterMovementNode::Uncontrollable(arc) = node {
@@ -222,7 +238,7 @@ impl FighterMovementMap {
                 } else {
                     None
                 }
-            })
+            }).ok_or(FighterMovementError::MovementNotFound(movement.clone()))
     }
 
     fn ensure_must_exists_movements(self) -> Self{
@@ -267,7 +283,7 @@ impl FighterMovementMap {
         let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.movement_map.insert(node_movement, FighterMovementNode::Uncontrollable(arc_movement_node.clone()));
-        self.uncontrollable_map.insert(node.base.movement, arc_movement_node);
+        self.uncontrollable_map.insert(node_movement.clone(), arc_movement_node);
     }
 }
 
@@ -279,24 +295,163 @@ impl Default for FighterMovementMap {
                 movement: FighterMovement::Idle,
                 sprite_name: "Idle".to_string(),
                 state_update: |_,_,_| {},
-                state_enter: |pos,vel| {vel.x = 0.0; vel.y = 0.0}, 
+                state_enter: |_,vel| {vel.x = 0.0; vel.y = 0.0}, 
             },
             hit_box: HitBox,
             hurt_box: HitBox
          });
                     
-        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::WalkingEast,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.x = WALKING_SPEED;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.x += fighter_velocity.x * delta_time;
-        //     },
-        //     sprite_name: "Walking".to_string(),
-        //     ..default()}
-        // );
+        map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Right]),
+        PersistentFighterMovementNode { 
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::WalkingEast,
+                sprite_name: "Walking".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                },
+                state_enter: |_,vel| {
+                    vel.x = WALKING_SPEED;
+                    vel.y = 0.0;
+                    }, 
+            },
+            player_can_enter: |floor_z, position_z| floor_z == position_z,
+            player_can_exit: |_,_,_,_| true,
+            hit_box: HitBox,
+            hurt_box: HitBox, 
+        });
+
+        map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Left]),
+        PersistentFighterMovementNode { 
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::WalkingWest,
+                sprite_name: "Walking".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                },
+                state_enter: |_,vel| {
+                    vel.x = -WALKING_SPEED;
+                    vel.y = 0.0;
+                    }, 
+            },
+            player_can_enter: |floor_z, position_z| floor_z == position_z,
+            player_can_exit: |_,_,_,_| true,
+            hit_box: HitBox,
+            hurt_box: HitBox, 
+        });
+
+        map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Up]),
+        PersistentFighterMovementNode { 
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::WalkingNorth,
+                sprite_name: "Walking".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                },
+                state_enter: |_,vel| {
+                    vel.x = 0.0;
+                    vel.y = WALKING_SPEED;
+                    }, 
+            },
+            player_can_enter: |floor_z, position_z| floor_z == position_z,
+            player_can_exit: |_,_,_,_| true,
+            hit_box: HitBox,
+            hurt_box: HitBox, 
+        });
+
+        map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Down]),
+        PersistentFighterMovementNode { 
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::WalkingSouth,
+                sprite_name: "Walking".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                },
+                state_enter: |_,vel| {
+                    vel.x = 0.0;
+                    vel.y = -WALKING_SPEED;
+                    }, 
+            },
+            player_can_enter: |floor_z, position_z| floor_z == position_z,
+            player_can_exit: |_,_,_,_| true,
+            hit_box: HitBox,
+            hurt_box: HitBox, 
+        });
+
+        map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Up,KeyTarget::Right]),
+        PersistentFighterMovementNode { 
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::WalkingNorthEast,
+                sprite_name: "Walking".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                },
+                state_enter: |_,vel| {
+                    vel.x = WALKING_SPEED/1.41;
+                    vel.y = WALKING_SPEED/1.41;
+                    }, 
+            },
+            player_can_enter: |floor_z, position_z| floor_z == position_z,
+            player_can_exit: |_,_,_,_| true,
+            hit_box: HitBox,
+            hurt_box: HitBox, 
+        });
+
+        map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Up,KeyTarget::Left]),
+        PersistentFighterMovementNode { 
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::WalkingNorthWest,
+                sprite_name: "Walking".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                },
+                state_enter: |_,vel| {
+                    vel.x = -WALKING_SPEED/1.41;
+                    vel.y = WALKING_SPEED/1.41;
+                    }, 
+            },
+            player_can_enter: |floor_z, position_z| floor_z == position_z,
+            player_can_exit: |_,_,_,_| true,
+            hit_box: HitBox,
+            hurt_box: HitBox, 
+        });
+
+        map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Down,KeyTarget::Right]),
+        PersistentFighterMovementNode { 
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::WalkingSouthEast,
+                sprite_name: "Walking".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                },
+                state_enter: |_,vel| {
+                    vel.x = WALKING_SPEED/1.41;
+                    vel.y = -WALKING_SPEED/1.41;
+                    }, 
+            },
+            player_can_enter: |floor_z, position_z| floor_z == position_z,
+            player_can_exit: |_,_,_,_| true,
+            hit_box: HitBox,
+            hurt_box: HitBox, 
+        });
+
+        map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Down,KeyTarget::Left]),
+        PersistentFighterMovementNode { 
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::WalkingSouthWest,
+                sprite_name: "Walking".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x*dt;
+                },
+                state_enter: |_,vel| {
+                    vel.x = -WALKING_SPEED/1.41;
+                    vel.y = -WALKING_SPEED/1.41;
+                    }, 
+            },
+            player_can_enter: |floor_z, position_z| floor_z == position_z,
+            player_can_exit: |_,_,_,_| true,
+            hit_box: HitBox,
+            hurt_box: HitBox, 
+        });
 
         // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
         // FighterMovementNode{
@@ -389,105 +544,6 @@ impl Default for FighterMovementMap {
         //         return false;
         //     },
         //     sprite_name: "AirSlashing".to_string(),
-        //     ..default()}
-        // );
-
-        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Left]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::WalkingWest,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.x = -WALKING_SPEED;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.x += fighter_velocity.x * delta_time;
-        //     },
-        //     sprite_name: "Walking".to_string(),
-        //     ..default()}
-        // );
-
-        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::WalkingNorth,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.y = WALKING_SPEED;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.y += fighter_velocity.y * delta_time;
-        //     },
-        //     sprite_name: "Walking".to_string(),
-        //     ..default()}
-        // );
-
-        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::WalkingSouth,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.y = -WALKING_SPEED;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.y += fighter_velocity.y * delta_time;
-        //     },
-        //     sprite_name: "Walking".to_string(),
-        //     ..default()}
-        // );
-
-        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Right, KeyTarget::Up]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::WalkingNorthEast,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.x = WALKING_SPEED/1.41;
-        //         fighter_velocity.y = WALKING_SPEED/1.41;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.x += fighter_velocity.x * delta_time;
-        //         fighter_position.y += fighter_velocity.y * delta_time;
-        //     },
-        //     sprite_name: "Walking".to_string(),
-        //     ..default()}
-        // );
-
-        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Up, KeyTarget::Left]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::WalkingNorthWest,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.x = -WALKING_SPEED/1.41;
-        //         fighter_velocity.y = WALKING_SPEED/1.41;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.x += fighter_velocity.x * delta_time;
-        //         fighter_position.y += fighter_velocity.y * delta_time;
-        //     },
-        //     sprite_name: "Walking".to_string(),
-        //     ..default()}
-        // );
-
-        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down, KeyTarget::Right]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::WalkingSouthEast,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.x = WALKING_SPEED/1.41;
-        //         fighter_velocity.y = -WALKING_SPEED/1.41;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.x += fighter_velocity.x * delta_time;
-        //         fighter_position.y += fighter_velocity.y * delta_time;
-        //     },
-        //     sprite_name: "Walking".to_string(),
-        //     ..default()}
-        // );
-
-        // map.insert_to_peristent_map(KeyTargetSet::from([KeyTarget::Down, KeyTarget::Left]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::WalkingSouthWest,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.x = -WALKING_SPEED/1.41;
-        //         fighter_velocity.y = -WALKING_SPEED/1.41;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.x += fighter_velocity.x * delta_time;
-        //         fighter_position.y += fighter_velocity.y * delta_time;
-        //     },
-        //     sprite_name: "Walking".to_string(),
         //     ..default()}
         // );
 
