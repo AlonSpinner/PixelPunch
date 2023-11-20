@@ -293,17 +293,17 @@ fn player_control(mut query: Query<(&Fighter,
         
         let persistent_keytargetset = player_controls.into_persistent_keytargetset(&keyboard_input);
         let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
-         
         event_keytargetset_stack.0.update(time.delta_seconds());
         movement_stack.0.update(time.delta_seconds());
-        let last_durative_movement = movement_stack.0.stack.last().unwrap();
+
+        let last_durative_movement : &TimeTaggedValue<FighterMovement> = movement_stack.last_value().unwrap();
+        let last_movement_node = fighter_map
+                .get_node_by_movement(&last_durative_movement.value)
+                .expect("Failed to get last movement node");
 
         event_keytargetset_stack.0.push(event_keytargetset);
         let joined_event_keytargetset = event_keytargetset_stack.join();
         let inner_event_keytargetset_stack = event_keytargetset_stack.into_inner();
-
-        let last_movement_node = fighter_map.get(&last_durative_movement.value).unwrap();
-
 
         // //try new event movement
         // if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
@@ -325,34 +325,47 @@ fn player_control(mut query: Query<(&Fighter,
         if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
             let ongoing_movement = movement_node.base.movement == last_durative_movement.value;
             if ongoing_movement {continue}; //no channeled persistent movements be design
-            let new_movement = 
-                !ongoing_movement &&
-                (movement_node.player_can_enter)(FLOOR_Z, position.z);
+            let can_enter = (movement_node.player_can_enter)(FLOOR_Z, position.z);
 
-                // last_movement_node.player_can_exit(FLOOR_Z, position.z,
-                //      last_durative_movement.duration,
-                //       &movement_node.movement);
-            if new_movement {
+            let can_exit = match last_movement_node {
+                FighterMovementNode::EventTriggered(node) => {
+                    (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
+                }
+                FighterMovementNode::Persistent(node) => {
+                    (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
+                }
+                FighterMovementNode::Uncontrollable(_) => true,
+            };
+
+            if can_enter && can_exit {
                 movement_stack.0.push(movement_node.base.movement);
                 (movement_node.base.state_enter)(&mut position, &mut velocity);
                 continue
             }
         } 
         
-        //try to enter idle
-        // if last_durative_movement.value != FighterMovement::Idle {
-        //     let cond1 = fighter_map.get(&FighterMovement::Idle).player_can_enter(FLOOR_Z, position.z,
-        //         &movement_stack, inner_event_keytargetset_stack);
-        //     let cond2 = last_movement_node.player_can_exit(FLOOR_Z, position.z,
-        //             last_durative_movement.duration,
-        //              &FighterMovement::Idle);
-        //     if cond1 && cond2 {
-        //         movement_stack.0.push(FighterMovement::Idle);
-        //         fighter_map.get(&FighterMovement::Idle).enter(
-        //                         &mut position, &mut velocity);
-        //         continue
-        //     }
-        // }
+        // try to enter idle
+        if last_durative_movement.value != FighterMovement::Idle {
+            let idle_node = fighter_map.get_uncontrollable_node(&FighterMovement::Idle)
+                .expect("Failed to get idle node");
+            let can_enter = (idle_node.player_can_enter)(FLOOR_Z, position.z);
+
+            let can_exit = match last_movement_node {
+                FighterMovementNode::EventTriggered(node) => {
+                    (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &idle_node.base.movement)
+                }
+                FighterMovementNode::Persistent(node) => {
+                    (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &idle_node.base.movement)
+                }
+                FighterMovementNode::Uncontrollable(_) => true,
+            };
+
+            if can_enter && can_exit {
+                movement_stack.0.push(FighterMovement::Idle);
+                (idle_node.base.state_enter)(&mut position, &mut velocity);
+                continue
+            }
+        }
 
         // //try to channel
         // let full_keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
@@ -375,7 +388,7 @@ fn update_state(mut query: Query<(&Fighter,
 
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         if let Some(last_durative_movement) = movement_stack.0.stack.last() {
-            let movement_node = fighter_map.get(&last_durative_movement.value).unwrap();
+            let movement_node = fighter_map.get_node_by_movement(&last_durative_movement.value).unwrap();
             movement_node.state_update(&mut position, &mut velocity, dt);
             position.x = position.x.clamp(WEST_WALL_X,EAST_WALL_X);
             position.y = position.y.clamp(SOUTH_WALL_Y, NORTH_WALL_Y);
@@ -404,7 +417,7 @@ fn draw_fighters(time: Res<Time>,
         
         if let Some(last_durative_movement) = movement_stack.0.stack.last() {
             let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap()
-                                                                .get(&last_durative_movement.value).unwrap();
+                                                                .get_node_by_movement(&last_durative_movement.value).unwrap();
             let sprite_name = movement_node.sprite_name();
 
             if animation_timer.just_finished() {
