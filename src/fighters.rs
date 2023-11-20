@@ -88,6 +88,10 @@ impl FighterMovementStack {
     pub fn last_value(&self) -> Option<&TimeTaggedValue<FighterMovement>> {
         self.0.stack.last()
     }
+
+    pub fn push(&mut self, value : FighterMovement) {
+        self.0.push(value);
+    }
 }
 pub struct HitBox;
 
@@ -142,8 +146,8 @@ pub enum FighterMovementNode {
 }
 
 pub struct FighterMovementMap {
-    pub event_map : HashMap<KeyTargetSet,Arc<EventFighterMovementNode>>,
-    pub persistent_map : HashMap<KeyTargetSet,Arc<PersistentFighterMovementNode>>,
+    pub event_map : HashMap<KeyTargetSet,Vec<Arc<EventFighterMovementNode>>>,
+    pub persistent_map : HashMap<KeyTargetSet,Vec<Arc<PersistentFighterMovementNode>>>,
     pub uncontrollable_map : HashMap<FighterMovement,Arc<UncontrollableFighterMovementNode>>,
     pub movement_map : HashMap<FighterMovement, FighterMovementNode>,
 }
@@ -238,7 +242,11 @@ impl FighterMovementMap {
         let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.movement_map.insert(node_movement, FighterMovementNode::EventTriggered(arc_movement_node.clone()));
-        self.event_map.insert(keyset, arc_movement_node);
+        if self.event_map.contains_key(&keyset) {
+            self.event_map.get_mut(&keyset).unwrap().push(arc_movement_node);
+        } else {
+            self.event_map.insert(keyset, vec![arc_movement_node]);
+        }
     }
 
     fn insert_to_persistent_map(&mut self, keyset : KeyTargetSet, node : PersistentFighterMovementNode) {
@@ -246,7 +254,11 @@ impl FighterMovementMap {
         let node_movement = node.base.movement.clone();
         let arc_movement_node = Arc::new(node);
         self.movement_map.insert(node_movement, FighterMovementNode::Persistent(arc_movement_node.clone()));
-        self.persistent_map.insert(keyset, arc_movement_node);
+        if self.persistent_map.contains_key(&keyset) {
+            self.persistent_map.get_mut(&keyset).unwrap().push(arc_movement_node);
+        } else {
+            self.persistent_map.insert(keyset, vec![arc_movement_node]);
+        }
     }
 
     fn insert_to_uncontrollable_map(&mut self, node : UncontrollableFighterMovementNode) {

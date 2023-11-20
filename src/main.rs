@@ -322,25 +322,27 @@ fn player_control(mut query: Query<(&Fighter,
         // }
         
         //try peristent movement
-        if let Some(movement_node) = fighter_map.persistent_map.get(&persistent_keytargetset) {
-            let ongoing_movement = movement_node.base.movement == last_durative_movement.value;
-            if ongoing_movement {continue}; //no channeled persistent movements be design
-            let can_enter = (movement_node.player_can_enter)(FLOOR_Z, position.z);
+        if let Some(movement_nodes) = fighter_map.persistent_map.get(&persistent_keytargetset) {
+            for movement_node in movement_nodes {
+                if movement_node.base.movement == last_durative_movement.value {continue}; //no channeled persistent movements be design
+                let can_enter = (movement_node.player_can_enter)(FLOOR_Z, position.z);
 
-            let can_exit = match last_movement_node {
-                FighterMovementNode::EventTriggered(node) => {
-                    (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
-                }
-                FighterMovementNode::Persistent(node) => {
-                    (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
-                }
-                FighterMovementNode::Uncontrollable(_) => true,
-            };
+                let can_exit = match last_movement_node {
+                    FighterMovementNode::EventTriggered(node) => {
+                        (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
+                    }
+                    FighterMovementNode::Persistent(node) => {
+                        (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
+                    }
+                    FighterMovementNode::Uncontrollable(_) => true,
+                };
 
-            if can_enter && can_exit {
-                movement_stack.0.push(movement_node.base.movement);
-                (movement_node.base.state_enter)(&mut position, &mut velocity);
-                continue
+                if can_enter && can_exit {
+                    movement_stack.push(movement_node.base.movement);
+                    (movement_node.base.state_enter)(&mut position, &mut velocity);
+                    continue
+                }
+            continue
             }
         } 
         
