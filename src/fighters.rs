@@ -458,6 +458,61 @@ impl Default for FighterMovementMap {
             hurt_box: HitBox, 
         });
 
+        map.insert_to_event_map(KeyTargetSet::from([KeyTarget::JumpJustPressed]),
+         EventFighterMovementNode { 
+            base: FighterMovementNodeBase {
+                movement: FighterMovement::Jumping,
+                sprite_name: "JumpLoop".to_string(),
+                state_update: |pos,vel,dt| {
+                    pos.x += vel.x * dt;
+                    pos.y += vel.y * dt;
+                    pos.z += vel.z * dt;
+                    vel.z += GRAVITY * dt;
+                },
+                state_enter: |_,vel| {vel.z = JUMPING_SPEED;},
+            }, 
+            player_can_enter: |floor_z,pos_z,_,_| floor_z == pos_z,
+            player_can_exit: |floor_z,pos_z,_,movement_request| 
+                {
+                    if movement_request == &FighterMovement::JumpAttack {
+                        return true
+                    } else if pos_z == floor_z {
+                        return true}
+                    else {
+                        return false};
+                },
+            channel: None,
+            duration: 0,
+            hit_boxes: Vec::new(),
+            hurt_boxes: Vec::new(),
+         });
+
+        // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::JumpJustPressed]),
+        // FighterMovementNode{
+        //     movement: FighterMovement::Jumping,
+        //     enter: |_, fighter_velocity| {
+        //         fighter_velocity.z = JUMPING_SPEED;
+        //     },
+        //     update: |fighter_position, fighter_velocity, delta_time| {
+        //         fighter_position.x += fighter_velocity.x * delta_time;
+        //         fighter_position.y += fighter_velocity.y * delta_time;
+        //         fighter_position.z += fighter_velocity.z * delta_time;
+        //         fighter_velocity.z += GRAVITY * delta_time;
+        //     },
+        //     player_can_exit: |floor_z,position_z,_,request| 
+                // {
+                //     if request == &FighterMovement::JumpAttack {
+                //         return true
+                //     } else if position_z == floor_z {
+                //         return true}
+                //     else {
+                //         return false};
+                // },
+                
+        //     sprite_name: "JumpLoop".to_string(),
+        //     ..default()}
+        // );
+
         // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::RightJustPressed]),
         // FighterMovementNode{
         //     movement: FighterMovement::RunningEast,
@@ -632,32 +687,6 @@ impl Default for FighterMovementMap {
         //         fighter_velocity.y = 0.0;
         //     },
         //     sprite_name: "Sliding".to_string(),
-        //     ..default()}
-        // );
-
-        // map.insert_to_event_map(KeyTargetSet::from([KeyTarget::JumpJustPressed]),
-        // FighterMovementNode{
-        //     movement: FighterMovement::Jumping,
-        //     enter: |_, fighter_velocity| {
-        //         fighter_velocity.z = JUMPING_SPEED;
-        //     },
-        //     update: |fighter_position, fighter_velocity, delta_time| {
-        //         fighter_position.x += fighter_velocity.x * delta_time;
-        //         fighter_position.y += fighter_velocity.y * delta_time;
-        //         fighter_position.z += fighter_velocity.z * delta_time;
-        //         fighter_velocity.z += GRAVITY * delta_time;
-        //     },
-        //     player_can_exit: |floor_z,position_z,_,request| 
-        //         {
-        //             if request == &FighterMovement::JumpAttack {
-        //                 return true
-        //             } else if position_z == floor_z {
-        //                 return true}
-        //             else {
-        //                 return false};
-        //         },
-                
-        //     sprite_name: "JumpLoop".to_string(),
         //     ..default()}
         // );
 
