@@ -6,8 +6,8 @@ use crate::utils::{TimeTaggedStack,TimeTaggedValue};
 use super::controls::{KeyTargetSet,KeyTarget};
 use std::collections::HashMap;
 use std::hash::Hash;
-use lazy_static::lazy_static;
 use std::sync::Arc;
+use once_cell::sync::Lazy;
 
 //movement
 pub const WALKING_SPEED : f32 = 100.0;
@@ -21,14 +21,12 @@ pub enum Fighter{
     HAMAS,
 }
 
-lazy_static! {
-pub static ref FIGHTERS_MOVEMENT_GRAPH : HashMap<Fighter, FighterMovementMap> = {
+pub static FIGHTERS_MOVEMENT_GRAPH : Lazy<HashMap<Fighter, FighterMovementMap>> = Lazy::new(||{
     let mut hashmap = HashMap::new();
     hashmap.insert(Fighter::IDF, FighterMovementMap::default().ensure_must_exists_movements());
     hashmap.insert(Fighter::HAMAS, FighterMovementMap::default().ensure_must_exists_movements());
     hashmap
-    };
-}
+    });
 
 #[derive(Component)]
 pub struct FighterHealth(pub f32);

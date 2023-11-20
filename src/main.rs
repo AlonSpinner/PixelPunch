@@ -1,6 +1,6 @@
 use bevy::{prelude::*,
      asset::LoadState,
-     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
+    //  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
     };
 use bevy_tile_atlas::TileAtlasBuilder;
 use std::collections::HashMap;
