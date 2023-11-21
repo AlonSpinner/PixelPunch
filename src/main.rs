@@ -270,31 +270,31 @@ fn setup_game(
     commands.insert_resource(fighters_movement_animation_indicies);
 }
 
-
-fn enter_request_node<T>(request_movement_nodes : Vec<&Arc<T>>,
-    movement_stack : &mut Mut<FighterMovementStack>,
-    position : &mut Mut<FighterPosition>,
-    velocity: &mut Mut<FighterVelocity>) -> bool 
-    where T: FighterMovementNodeTrait
-    {
-
-        match request_movement_nodes.len() {
-            0 => false,
-            1 => {
-                let new_movement_node: &&Arc<T> = &request_movement_nodes[0];
-                movement_stack.push(new_movement_node.movement());
-                new_movement_node.state_enter(position, velocity);
-                true
-            }
-            _ => {
-                let culprit_movements = request_movement_nodes.iter()
-                            .map(|x| x.movement())
-                            .collect::<Vec<_>>();
-                panic!("two or more movements. the culprits are {:#?}", culprit_movements)
-            },   
+//given a vec of request nodes, enter requested node if vec.len()==1
+//returns true if entered, else false
+fn enter_requested_node<T>(request_movement_nodes : Vec<&Arc<T>>,
+    movement_stack : &mut FighterMovementStack,
+    position : &mut FighterPosition,
+    velocity: &mut FighterVelocity) -> bool 
+    where T: FighterMovementNodeTrait {
+    match request_movement_nodes.len() {
+        0 => false,
+        1 => {
+            let new_movement_node: &&Arc<T> = &request_movement_nodes[0];
+            movement_stack.push(new_movement_node.movement());
+            new_movement_node.state_enter(position, velocity);
+            true
         }
+        _ => {
+            let culprit_movements = request_movement_nodes.iter()
+                        .map(|x| x.movement())
+                        .collect::<Vec<_>>();
+            panic!("two or more movements. the culprits are {:#?}", culprit_movements)
+        },   
     }
+}
 
+//each variant might have a different signature for the exit
 fn can_exit_node<T>(request_movement_node : &Arc<T>,
                  current_movement_node : &FighterMovementNode,
                 pos_z : f32, current_movement_duration :f32,) -> bool
@@ -337,7 +337,7 @@ fn player_control(mut query: Query<(&Fighter,
         event_keytargetset_stack.0.push(event_keytargetset.clone());
         // let joined_event_keytargetset = event_keytargetset_stack.join();
 
-        let current_durative_movement = movement_stack.last_value()
+        let current_durative_movement = movement_stack.last()
             .expect("movement_stack is empty").clone();
         let current_movement_node = fighter_map
                 .get_node_by_movement(&current_durative_movement.value)
@@ -345,53 +345,30 @@ fn player_control(mut query: Query<(&Fighter,
 
         //try an event triggered from current event_keytargetset
         if let Some(movement_nodes) = fighter_map.event_map.get(&event_keytargetset) {
-        let filtered_request_nodes = movement_nodes.iter().filter(|request_movement_node| {
-            let can_enter = (request_movement_node.player_can_enter)(FLOOR_Z, position.z, &movement_stack, &mut event_keytargetset_stack);
-            let can_exit = can_exit_node(request_movement_node, current_movement_node, position.z, current_durative_movement.duration);
-            can_enter & can_exit
-            }).collect::<Vec<_>>();
-            if enter_request_node(filtered_request_nodes, &mut movement_stack, &mut position, &mut velocity) {
+            let filtered_request_nodes = movement_nodes.iter().filter(|request_movement_node| {
+                let can_enter = (request_movement_node.player_can_enter)(FLOOR_Z, position.z, &movement_stack, &mut event_keytargetset_stack, false);
+                let can_exit = can_exit_node(request_movement_node, current_movement_node, position.z, current_durative_movement.duration);
+                can_enter & can_exit
+                }).collect::<Vec<_>>();
+            if enter_requested_node(filtered_request_nodes, &mut movement_stack, &mut position, &mut velocity) {
                 continue
             };
         }
 
-        // //try an event triggered movement from joined keytargetset
-        // if let Some(movement_nodes) = fighter_map.event_map.get(&joined_event_keytargetset) {
-        // let filtered_nodes = movement_nodes.iter().filter(|movement_node| {
-        //     let can_enter = (movement_node.player_can_enter)(FLOOR_Z, position.z, &movement_stack, inner_event_keytargetset_stack);
+        //try an event triggered movement from joined keytargetset
+        let joined_event_keytargetset = event_keytargetset_stack.join();
+        if let Some(movement_nodes) = fighter_map.event_map.get(&joined_event_keytargetset) {
+            let filtered_request_nodes = movement_nodes.iter().filter(|request_movement_node| {
+                let can_enter = (request_movement_node.player_can_enter)(FLOOR_Z, position.z, &movement_stack, &mut event_keytargetset_stack, true);
+                let can_exit = can_exit_node(request_movement_node, current_movement_node, position.z, current_durative_movement.duration);
+                can_enter & can_exit
+                }).collect::<Vec<_>>();
+            if enter_requested_node(filtered_request_nodes, &mut movement_stack, &mut position, &mut velocity) {
+                continue
+            };
+        }        
 
-        //     let can_exit = match last_movement_node {
-        //         FighterMovementNode::EventTriggered(node) => {
-        //             (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
-        //         }
-        //         FighterMovementNode::Persistent(node) => {
-        //             (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
-        //         }
-        //         FighterMovementNode::Uncontrollable(_) => true,
-        //     };
-
-        //     can_enter & can_exit
-        //     }).collect::<Vec<_>>();
-
-        //     match filtered_nodes.len() {
-        //         0 => (),
-        //         1 => {
-        //             let new_movement_node = filtered_nodes[0];
-        //             info!("fighter {} moved to new movement {}", &fighter, &new_movement_node.base.movement);
-        //             movement_stack.push(new_movement_node.base.movement);
-        //             (new_movement_node.base.state_enter)(&mut position, &mut velocity);
-        //             continue
-        //         }
-        //         _ => {
-        //             let culprit_movements = filtered_nodes.iter()
-        //                         .map(|x| x.base.movement)
-        //                         .collect::<Vec<_>>();
-        //             panic!("two or more event movements. the culprits are {:#?}", culprit_movements)
-        //         },   
-        //     }
-        // }
-        
-        //try to enter persitent new movement
+        //check if repeating persistent movement and if not, try to enter a new persitent movement
         let persistent_keytargetset = player_controls.into_persistent_keytargetset(&keyboard_input);
         if let Some(movement_nodes) = fighter_map.persistent_map.get(&persistent_keytargetset) {
             let repeating_movement = movement_nodes.iter()
@@ -403,10 +380,11 @@ fn player_control(mut query: Query<(&Fighter,
                 let can_exit = can_exit_node(request_movement_node, current_movement_node, position.z, current_durative_movement.duration);
                 can_enter & can_exit
                 }).collect::<Vec<_>>();
-                if enter_request_node(filtered_request_nodes,&mut movement_stack,&mut position,&mut velocity) {
-                    continue
-                };
-            }
+            
+            if enter_requested_node(filtered_request_nodes,&mut movement_stack,&mut position,&mut velocity) {
+                continue
+            };
+        }
 
         //try to enter idle
         if current_durative_movement.value != FighterMovement::Idle {
@@ -416,14 +394,13 @@ fn player_control(mut query: Query<(&Fighter,
             let can_exit = can_exit_node(&idle_node, current_movement_node, position.z, current_durative_movement.duration);
 
             if can_enter && can_exit {
-                info!("fighter {} moved to new movement {}", &fighter, &idle_node.movement());
                 movement_stack.0.push(FighterMovement::Idle);
                 (idle_node.base.state_enter)(&mut position, &mut velocity);
                 continue
             }
         }
     
-        //try to channel
+        //if all else failed, see if its a channel
         let full_keytargetset = player_controls.into_full_keytargetset(&keyboard_input);
         if let FighterMovementNode::EventTriggered(node) = current_movement_node {
             if let Some(channel) = node.channel {
