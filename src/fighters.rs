@@ -103,6 +103,12 @@ pub struct FighterMovementNodeBase {
                    fighter_velocity : &mut FighterVelocity),
 }
 
+pub struct DurationAndFallback {
+    pub duration : f32,
+    pub fallback : FighterMovement,
+    pub apply_enter_state_fcn : bool
+}
+
 pub struct EventFighterMovementNode {
     pub base : FighterMovementNodeBase,
     pub player_can_enter : fn(floor_z : f32,
@@ -115,7 +121,7 @@ pub struct EventFighterMovementNode {
             movement_duration : f32,
             movement_request : &FighterMovement) -> bool,
     pub channel : Option<fn (full_keyset : &KeyTargetSet, fighter_velocity : &mut FighterVelocity)>,
-    pub duration : usize,
+    pub duration_and_fallback : Option<DurationAndFallback>,
     pub hit_boxes : Vec<HitBox>,
     pub hurt_boxes : Vec<HitBox>,
 }
@@ -519,7 +525,7 @@ impl Default for FighterMovementMap {
                         return false};
                 },
             channel: None,
-            duration: 0,
+            duration_and_fallback: None,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
          });
@@ -593,7 +599,7 @@ impl Default for FighterMovementMap {
                         vel.y = -WALKING_SPEED;
                     }
                 }),
-            duration: 0,
+            duration_and_fallback: None,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
          });
@@ -667,7 +673,7 @@ impl Default for FighterMovementMap {
                         vel.y = -WALKING_SPEED;
                     }
                 }),
-            duration: 0,
+            duration_and_fallback: None,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
          });
@@ -706,7 +712,7 @@ impl Default for FighterMovementMap {
                 prev_movement_duration > 0.5
             },
             channel: None,
-            duration: 0,
+            duration_and_fallback: None,
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
          });
@@ -736,7 +742,11 @@ impl Default for FighterMovementMap {
                 floor_z == pos_z
             },
             channel: None,
-            duration: 0,
+            duration_and_fallback: Some(DurationAndFallback {
+                duration: 0.5,
+                fallback: FighterMovement::Jumping,
+                apply_enter_state_fcn: false, 
+            }),
             hit_boxes: Vec::new(),
             hurt_boxes: Vec::new(),
          });

@@ -46,7 +46,7 @@ fn main() {
     )
     .add_systems(
         Update,
-        (update_state,
+        (state_update,
                  draw_fighters).run_if(in_state(AppState::InGame)),
     )
     .add_systems(Update, bevy::window::close_on_esc)
@@ -335,7 +335,6 @@ fn player_control(mut query: Query<(&Fighter,
         let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
         event_keytargetset_stack.0.update(time.delta_seconds());
         event_keytargetset_stack.0.push(event_keytargetset.clone());
-        // let joined_event_keytargetset = event_keytargetset_stack.join();
 
         let current_durative_movement = movement_stack.last()
             .expect("movement_stack is empty").clone();
@@ -388,7 +387,7 @@ fn player_control(mut query: Query<(&Fighter,
 
         //try to enter idle
         if current_durative_movement.value != FighterMovement::Idle {
-            let idle_node = fighter_map.get_uncontrollable_node(&FighterMovement::Idle)
+            let idle_node = &fighter_map.get_uncontrollable_node(&FighterMovement::Idle)
                 .expect("Failed to get idle node");
             let can_enter = (idle_node.player_can_enter)(FLOOR_Z, position.z);
             let can_exit = can_exit_node(&idle_node, current_movement_node, position.z, current_durative_movement.duration);
@@ -409,21 +408,33 @@ fn player_control(mut query: Query<(&Fighter,
         }
     }  
 }
-fn update_state(mut query: Query<(&Fighter,
+fn state_update(mut query: Query<(&Fighter,
                                     &mut FighterPosition,
                                     &mut FighterVelocity,
-                                    &FighterMovementStack,)>,
+                                    &mut FighterMovementStack,)>,
                                     time: Res<Time>,) {
     let dt = time.delta_seconds();
     
     for (fighter,
         mut position,
         mut velocity,
-        movement_stack) in query.iter_mut() {
+        mut movement_stack) in query.iter_mut() {
 
-        let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-        if let Some(last_durative_movement) = movement_stack.0.stack.last() {
-            let movement_node = fighter_map.get_node_by_movement(&last_durative_movement.value).unwrap();
+        let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter)
+            .expect("fighter does not exist in the movement graph");
+        if let Some(current_durative_movement) = movement_stack.last() {
+            let movement_node = fighter_map.get_node_by_movement(&current_durative_movement.value)
+                .expect("movement wasn't found in fighter_map");
+
+            if let FighterMovementNode::EventTriggered(node) = movement_node {
+                if let Some(duration_and_fallback) = &node.duration_and_fallback {
+                    if current_durative_movement.duration > duration_and_fallback.duration {
+                        movement_stack.push(duration_and_fallback.fallback);
+                        continue;
+                    }
+                }
+            }
+
             movement_node.state_update(&mut position, &mut velocity, dt);
             position.x = position.x.clamp(WEST_WALL_X,EAST_WALL_X);
             position.y = position.y.clamp(SOUTH_WALL_Y, NORTH_WALL_Y);
