@@ -16,7 +16,6 @@ pub mod utils;
 use utils::*;
 
 //scene
-
 const CEILING_Z : f32 = -100.0;
 const FLOOR_Z : f32 = -335.0;
 const NORTH_WALL_Y : f32 = 80.0;
@@ -290,8 +289,14 @@ fn player_control(mut query: Query<(&Fighter,
         mut velocity) in query.iter_mut() {
 
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
-        event_keytargetset_stack.0.update(time.delta_seconds());
+
+        //update event_keytargetset_stack and movement stack
         movement_stack.0.update(time.delta_seconds());
+        let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
+        event_keytargetset_stack.0.update(time.delta_seconds());
+        event_keytargetset_stack.0.push(event_keytargetset.clone());
+        let joined_event_keytargetset = event_keytargetset_stack.join();
+        let inner_event_keytargetset_stack = event_keytargetset_stack.into_inner();
 
         let last_durative_movement = movement_stack.last_value()
             .expect("movement_stack is empty").clone();
@@ -299,30 +304,43 @@ fn player_control(mut query: Query<(&Fighter,
                 .get_node_by_movement(&last_durative_movement.value)
                 .expect("Failed to get last movement node");
 
+        //try an event triggered from current event_keytargetset
+        if let Some(movement_nodes) = fighter_map.event_map.get(&event_keytargetset) {
+        let filtered_nodes = movement_nodes.iter().filter(|movement_node| {
+            let can_enter = (movement_node.player_can_enter)(FLOOR_Z, position.z, &movement_stack, inner_event_keytargetset_stack);
 
+            let can_exit = match last_movement_node {
+                FighterMovementNode::EventTriggered(node) => {
+                    (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
+                }
+                FighterMovementNode::Persistent(node) => {
+                    (node.player_can_exit)(FLOOR_Z, position.z, last_durative_movement.duration, &movement_node.base.movement)
+                }
+                FighterMovementNode::Uncontrollable(_) => true,
+            };
 
-        // // //try new event movement
-        // if let Some(movement_node) = fighter_map.event_map.get(&joined_event_keytargetset) {
-        //     let cond1 = 
-        //         movement_node.player_can_enter(FLOOR_Z, position.z,
-        //              &movement_stack, inner_event_keytargetset_stack);
-        //     let cond2 = last_movement_node.player_can_exit(FLOOR_Z, position.z,
-        //              last_durative_movement.duration,
-        //               &movement_node.movement);
-        //     if cond1 && cond2 {
-        //         movement_stack.0.push(movement_node.movement);
-        //         fighter_map.get(&movement_node.movement).enter(
-        //             &mut position, &mut velocity);
-        //         continue
-        //     }
-        // }
+            can_enter & can_exit
+            }).collect::<Vec<_>>();
 
+            match filtered_nodes.len() {
+                0 => (),
+                1 => {
+                    let new_movement_node = filtered_nodes[0];
+                    info!("fighter {} moved to new movement {}", &fighter, &new_movement_node.base.movement);
+                    movement_stack.push(new_movement_node.base.movement);
+                    (new_movement_node.base.state_enter)(&mut position, &mut velocity);
+                    continue
+                }
+                _ => {
+                    let culprit_movements = filtered_nodes.iter()
+                                .map(|x| x.base.movement)
+                                .collect::<Vec<_>>();
+                    panic!("two or more event movements. the culprits are {:#?}", culprit_movements)
+                },   
+            }
+        } else {info!("found no event movement nods to match keytargetset")}
 
-        //try event triggered movement
-        let event_keytargetset = player_controls.into_event_keytargetset(&keyboard_input);
-        event_keytargetset_stack.0.push(event_keytargetset);
-        let joined_event_keytargetset = event_keytargetset_stack.join();
-        let inner_event_keytargetset_stack = event_keytargetset_stack.into_inner();
+        //try an event triggered movement from joined keytargetset
         if let Some(movement_nodes) = fighter_map.event_map.get(&joined_event_keytargetset) {
         let filtered_nodes = movement_nodes.iter().filter(|movement_node| {
             let can_enter = (movement_node.player_can_enter)(FLOOR_Z, position.z, &movement_stack, inner_event_keytargetset_stack);
@@ -353,7 +371,7 @@ fn player_control(mut query: Query<(&Fighter,
                     let culprit_movements = filtered_nodes.iter()
                                 .map(|x| x.base.movement)
                                 .collect::<Vec<_>>();
-                    panic!("two or more persistent movements. the culprits are {:#?}", culprit_movements)
+                    panic!("two or more event movements. the culprits are {:#?}", culprit_movements)
                 },   
             }
         }
