@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use std::ops::Add;
 use std::fmt::Display;
 use std::fmt;
-use crate::utils::DurativeStack;
+use crate::datatypes::DurativeStack;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Ord, PartialOrd, Debug)]
 pub enum KeyTarget{

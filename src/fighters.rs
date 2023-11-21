@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use strum_macros::Display;
 use crate::controls::KeyTargetSetStack;
-use crate::utils::{TimeTaggedStack,TimeTaggedValue};
+use crate::datatypes::{TimeTaggedStack,TimeTaggedValue};
 
 use super::controls::{KeyTargetSet,KeyTarget};
 use std::collections::HashMap;
@@ -107,8 +107,8 @@ pub struct EventFighterMovementNode {
     pub base : FighterMovementNodeBase,
     pub player_can_enter : fn(floor_z : f32,
         position_z : f32,
-        fighter_movement_stack : &FighterMovementStack,
-        keyset : &mut KeyTargetSetStack) -> bool,
+        movement_stack : &FighterMovementStack,
+        keytargetset_stack : &mut Mut<KeyTargetSetStack>) -> bool,
     pub player_can_exit : fn(floor_z : f32,
             position_z : f32,
             movement_duration : f32,
@@ -137,10 +137,77 @@ pub struct UncontrollableFighterMovementNode {
     pub hurt_box : HitBox,
 }
 
+pub trait FighterMovementNodeTrait {
+    fn movement(&self) -> FighterMovement;
+    fn state_enter(&self, fighter_position : &mut FighterPosition,
+                        fighter_velocity : &mut FighterVelocity) -> ();
+    fn state_update(&self, fighter_position : &mut FighterPosition,
+                        fighter_velocity : &mut FighterVelocity,
+                        delta_time : f32) -> ();
+    fn sprite_name(&self) -> &String;
+}
+
+macro_rules! impl_fighter_movement_node_trait {
+    ($type:ty) => {
+        impl FighterMovementNodeTrait for $type {
+            fn movement(&self) -> FighterMovement {
+                self.base.movement
+            }
+            fn state_enter(&self, fighter_position: &mut FighterPosition, fighter_velocity: &mut FighterVelocity) {
+                (self.base.state_enter)(fighter_position, fighter_velocity);
+            }
+            fn state_update(&self, fighter_position: &mut FighterPosition, fighter_velocity: &mut FighterVelocity, delta_time: f32) {
+                (self.base.state_update)(fighter_position, fighter_velocity, delta_time);
+            }
+            fn sprite_name(&self) -> &String {
+                &self.base.sprite_name
+            }
+        }
+    };
+}
+
+impl_fighter_movement_node_trait!(EventFighterMovementNode);
+impl_fighter_movement_node_trait!(PersistentFighterMovementNode);
+impl_fighter_movement_node_trait!(UncontrollableFighterMovementNode);
+
 pub enum FighterMovementNode {
     EventTriggered(Arc<EventFighterMovementNode>),
     Persistent(Arc<PersistentFighterMovementNode>),
     Uncontrollable(Arc<UncontrollableFighterMovementNode>),
+}
+
+impl FighterMovementNodeTrait for FighterMovementNode {
+    fn movement(&self) -> FighterMovement {
+        match self {
+            FighterMovementNode::EventTriggered(node) => {node.movement()},
+            FighterMovementNode::Persistent(node) => {node.movement()},
+            FighterMovementNode::Uncontrollable(node) => {node.movement()},
+        }
+    }
+
+    fn sprite_name(&self) -> &String {
+        match self {
+            FighterMovementNode::EventTriggered(node) => {node.sprite_name()},
+            FighterMovementNode::Persistent(node) => {node.sprite_name()},
+            FighterMovementNode::Uncontrollable(node) => {node.sprite_name()},
+        }
+    }
+
+    fn state_update(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity, dt : f32) {
+        match self {
+            FighterMovementNode::EventTriggered(node) => {node.state_update(pos,vel,dt)},
+            FighterMovementNode::Persistent(node) => {node.state_update(pos,vel,dt)},
+            FighterMovementNode::Uncontrollable(node) => {node.state_update(pos,vel,dt)},
+        };
+    }
+
+    fn state_enter(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity) {
+        match self {
+            FighterMovementNode::EventTriggered(node) => {node.state_enter(pos,vel)},
+            FighterMovementNode::Persistent(node) => {node.state_enter(pos,vel)},
+            FighterMovementNode::Uncontrollable(node) => {node.state_enter(pos,vel)}
+        };
+    }
 }
 
 pub struct FighterMovementMap {
@@ -149,35 +216,6 @@ pub struct FighterMovementMap {
     pub uncontrollable_map : HashMap<FighterMovement,Arc<UncontrollableFighterMovementNode>>,
     pub movement_map : HashMap<FighterMovement, FighterMovementNode>,
 }
-
-impl FighterMovementNode {
-    pub fn sprite_name(&self) -> &String {
-        match self {
-            FighterMovementNode::EventTriggered(node) => {&node.base.sprite_name},
-            FighterMovementNode::Persistent(node) => {&node.base.sprite_name},
-            FighterMovementNode::Uncontrollable(node) => {&node.base.sprite_name},
-        }
-    }
-
-    pub fn state_update(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity, dt : f32) {
-        let state_update_fn = match self {
-            FighterMovementNode::EventTriggered(node) => {&node.base.state_update},
-            FighterMovementNode::Persistent(node) => {&node.base.state_update},
-            FighterMovementNode::Uncontrollable(node) => {&node.base.state_update},
-        };
-        state_update_fn(pos,vel,dt);
-    }
-
-    pub fn state_enter(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity) {
-        let state_update_fn = match self {
-            FighterMovementNode::EventTriggered(node) => {&node.base.state_enter},
-            FighterMovementNode::Persistent(node) => {&node.base.state_enter},
-            FighterMovementNode::Uncontrollable(node) => {&node.base.state_enter},
-        };
-        state_update_fn(pos,vel);
-    }
-}
-
 #[derive(Debug)]
 pub enum FighterMovementError {
     MovementNotFound(FighterMovement),
