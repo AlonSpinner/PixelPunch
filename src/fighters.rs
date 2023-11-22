@@ -29,7 +29,11 @@ pub static FIGHTERS_MOVEMENT_GRAPH : Lazy<HashMap<Fighter, FighterMovementMap>> 
     });
 
 #[derive(Component)]
-pub struct FighterHealth(pub f32);
+pub struct FighterHealth{
+    pub current: f32,
+    pub max: f32,
+}
+
 #[derive(Component)]
 pub struct FighterPosition {
     pub x : f32, //right
@@ -707,7 +711,10 @@ impl Default for FighterMovementMap {
                     vel.y = 0.0;
                 },
             }, 
-            player_can_enter: |floor_z,pos_z,_,_,_| floor_z == pos_z,
+            player_can_enter: |floor_z,pos_z,_,_,joined_keytargetset| {
+                if joined_keytargetset {return false};
+                floor_z == pos_z 
+            },
             player_can_exit: |_,_,prev_movement_duration ,_| {
                 prev_movement_duration > 0.5
             },

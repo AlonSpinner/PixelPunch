@@ -15,6 +15,8 @@ pub mod controls;
 use controls::*;
 pub mod datatypes;
 use datatypes::*;
+pub mod statbar;
+use statbar::*;
 
 //scene
 const CEILING_Z : f32 = -100.0;
@@ -46,8 +48,13 @@ fn main() {
     )
     .add_systems(
         Update,
-        (state_update,
-                 draw_fighters).run_if(in_state(AppState::InGame)),
+        (update_state).run_if(in_state(AppState::InGame)),
+    )
+    .add_systems(
+        PostUpdate,
+        (draw_fighters,
+                // update_healthbars
+                ).run_if(in_state(AppState::InGame)),
     )
     .add_systems(Update, bevy::window::close_on_esc)
     .run();
@@ -77,6 +84,7 @@ struct PlayerBundle{
     event_keytargetset_stack : KeyTargetSetStack,
     sprite: SpriteSheetBundle,
     controls: PlayerControls,
+    health_bar : StatBarBundle,
 }
 
 impl Default for PlayerBundle {
@@ -87,13 +95,22 @@ impl Default for PlayerBundle {
         Self{
             player: Player::Player1,
             fighter: Fighter::IDF,
-            health : FighterHealth(100.0),
+            health : FighterHealth{current : 100.0, max : 100.0},
             position : FighterPosition{x : 0.0, y :0.0, z : 0.0},
             velocity : FighterVelocity{x : 0.0, y :0.0, z :0.0},
             movement_stack : movement_stack,
             event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
             sprite : SpriteSheetBundle::default(),
             controls : PlayerControls::default(),
+            health_bar : StatBarBundle::new(
+                                        Color::rgb(0.0, 1.0, 0.0),
+                                        Color::rgb(0.0, 0.0, 0.0),
+                                        1000.0,
+                                        100.0,
+                                        Vec2::new(0.0, 0.0),
+                                        false,
+                                        false,
+                                        1.0),
         }
     }
 }
@@ -199,14 +216,14 @@ fn setup_game(
     let mut window = windows.single_mut();
     window.title = "pixel punch".into();
     let background_handle = asset_loading.background_sprites[0].clone();  
-    commands.spawn(SpriteBundle {
-        texture: background_handle,
-        sprite: Sprite {
-            custom_size: Some(Vec2::new(window.width(), window.height())),
-            ..default()},
-        transform: Transform::from_xyz(0.0, 0.0, -NORTH_WALL_Y),
-        ..default()
-    });
+    // commands.spawn(SpriteBundle {
+    //     texture: background_handle,
+    //     sprite: Sprite {
+    //         custom_size: Some(Vec2::new(window.width(), window.height())),
+    //         ..default()},
+    //     transform: Transform::from_xyz(0.0, 0.0, -NORTH_WALL_Y),
+    //     ..default()
+    // });
 
     //build texture atlases for all fighters
     let mut fighters_movement_animation_indicies = FightersMovementAnimationIndicies(HashMap::new());
@@ -226,6 +243,45 @@ fn setup_game(
         fighters_movement_animation_indicies.0.insert(*fighter, fighter_animation_hash);
     }
 
+    // Rectangle
+    // commands.spawn(SpriteBundle {
+    //     sprite: Sprite {
+    //         color: Color::rgb(0.25, 0.25, 0.75),
+    //         custom_size: Some(Vec2::new(50.0, 100.0)),
+    //         ..default()
+    //     },
+    //     transform: Transform::from_translation(Vec3::new(-50., 0., 0.)),
+    //     ..default()
+    // });
+
+    //My Rectangle
+    // commands.spawn(SpriteBundle {
+    //     sprite: Sprite {
+    //         color : Color::rgb(1.0,0.0,0.0),
+    //         flip_x : false,
+    //         flip_y : false,
+    //         // rect : Some(Rect {min :  Vec2::new(0.0, 0.0), max : Vec2::new(length * value, thickness),}),
+
+    //         anchor : bevy::sprite::Anchor::Center,
+    //         custom_size: Some(Vec2::new(50.0, 1000.0)),
+    //         ..default()
+    //     },
+    //     transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
+    //     // visibility: if hide {Visibility::Hidden} else {Visibility::Visible},
+    //     ..default()
+    // });
+
+    commands.spawn(StatBarBundle::new(
+        Color::rgb(0.0, 1.0, 0.0),
+        Color::rgb(0.0, 0.0, 0.0),
+        1000.0,
+        100.0,
+        Vec2::new(0.0, 0.0),
+        false,
+        false,
+        1.0,
+    ));
+
     //player1
     let player = Player::Player1;
     let fighter = FIGHTERS[0];
@@ -233,7 +289,7 @@ fn setup_game(
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
         sprite: TextureAtlasSprite::default(),
         ..default()};
-    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle.clone(),
+    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
                                         player : player,
                                         fighter : fighter,
                                         position : FighterPosition{x : WEST_WALL_X + 200.0, y :0.0, z : CEILING_Z},
@@ -241,22 +297,22 @@ fn setup_game(
                                         ..default()});
 
     // player2
-    let player = Player::Player2;
-    let fighter = Fighter::HAMAS;
-    let player2_controls = PlayerControls{
-        up: KeyCode::Up,
-        down: KeyCode::Down,
-        left: KeyCode::Left,
-        right: KeyCode::Right,
-        attack: KeyCode::Period,
-        jump: KeyCode::Comma,
-        defend: KeyCode::M
-    };
+    // let player = Player::Player2;
+    // let fighter = Fighter::HAMAS;
+    // let player2_controls = PlayerControls{
+    //     up: KeyCode::Up,
+    //     down: KeyCode::Down,
+    //     left: KeyCode::Left,
+    //     right: KeyCode::Right,
+    //     attack: KeyCode::Period,
+    //     jump: KeyCode::Comma,
+    //     defend: KeyCode::M
+    // };
 
-    let sprite_sheet_bundle = SpriteSheetBundle {
-        texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
-        sprite: TextureAtlasSprite{flip_x : true, ..default()},
-        ..default()};
+    // let sprite_sheet_bundle = SpriteSheetBundle {
+    //     texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
+    //     sprite: TextureAtlasSprite{flip_x : true, ..default()},
+    //     ..default()};
     // commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
     //                                     player : player,
     //                                     fighter : fighter,
@@ -264,6 +320,7 @@ fn setup_game(
     //                                     velocity : FighterVelocity{x : 0.0, y : 0.0, z : -JUMPING_SPEED},
     //                                     controls: player2_controls,
     //                                     ..default()});
+    
     
     //insert resources
     commands.insert_resource(AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating)));
@@ -283,6 +340,7 @@ fn enter_requested_node<T>(request_movement_nodes : Vec<&Arc<T>>,
             let new_movement_node: &&Arc<T> = &request_movement_nodes[0];
             movement_stack.push(new_movement_node.movement());
             new_movement_node.state_enter(position, velocity);
+            info!("entered movement {:?}", new_movement_node.movement());
             true
         }
         _ => {
@@ -408,7 +466,7 @@ fn player_control(mut query: Query<(&Fighter,
         }
     }  
 }
-fn state_update(mut query: Query<(&Fighter,
+fn update_state(mut query: Query<(&Fighter,
                                     &mut FighterPosition,
                                     &mut FighterVelocity,
                                     &mut FighterMovementStack,)>,
@@ -440,6 +498,15 @@ fn state_update(mut query: Query<(&Fighter,
             position.y = position.y.clamp(SOUTH_WALL_Y, NORTH_WALL_Y);
             position.z = position.z.clamp(FLOOR_Z, CEILING_Z);
         }
+    }
+}
+
+fn update_healthbars(mut query: Query<(&FighterHealth,
+                                    &mut StatBarBundle,)>) {
+    for (health,
+        mut statbar) in query.iter_mut() {
+ 
+        statbar.update_value(health.current/health.max);
     }
 }
 
