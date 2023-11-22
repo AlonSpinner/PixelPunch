@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use std::ops::Add;
 use std::fmt::Display;
 use std::fmt;
-use crate::utils::DurativeStack;
+use crate::datatypes::DurativeStack;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Ord, PartialOrd, Debug)]
 pub enum KeyTarget{
@@ -17,6 +17,8 @@ pub enum KeyTarget{
     RightJustPressed,
     Attack,
     AttackJustPressed,
+    Jump,
+    JumpJustPressed,
     Defend,
     DefendJustPressed,
 }
@@ -50,6 +52,14 @@ impl KeyTargetSet {
 
     pub fn is_superset(&self, other: &Self) -> bool {
         self.0.is_superset(&other.0)
+    }
+
+    pub fn overlaps(&self, other: &Self) -> bool {
+        !self.0.is_disjoint(&other.0)
+    }
+
+    pub fn contains(&self, other: &KeyTarget) -> bool {
+        self.0.contains(other)
     }
 }
 
@@ -105,6 +115,7 @@ pub struct PlayerControls{
     pub left : KeyCode,
     pub right : KeyCode,
     pub attack : KeyCode,
+    pub jump : KeyCode,
     pub defend : KeyCode,
 }
 
@@ -116,7 +127,8 @@ impl Default for PlayerControls {
             left : KeyCode::A,
             right : KeyCode::D,
             attack: KeyCode::G,
-            defend: KeyCode::H,
+            jump: KeyCode::H,
+            defend: KeyCode::J,
         }
     }
 }
@@ -138,6 +150,9 @@ impl PlayerControls {
         }
         if keyboard_input.pressed(self.attack) {
             pressed_keys = pressed_keys + KeyTarget::Attack;
+        }
+        if keyboard_input.pressed(self.jump) {
+            pressed_keys = pressed_keys + KeyTarget::Jump;
         }
         if keyboard_input.pressed(self.defend) {
             pressed_keys = pressed_keys + KeyTarget::Defend;
@@ -161,6 +176,9 @@ impl PlayerControls {
         }
         if keyboard_input.just_pressed(self.attack) {
             just_pressed_keys = just_pressed_keys + KeyTarget::AttackJustPressed;
+        }
+        if keyboard_input.just_pressed(self.jump) {
+            just_pressed_keys = just_pressed_keys + KeyTarget::JumpJustPressed;
         }
         if keyboard_input.just_pressed(self.defend) {
             just_pressed_keys = just_pressed_keys + KeyTarget::DefendJustPressed;
