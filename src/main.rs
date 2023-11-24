@@ -9,16 +9,16 @@ use std::time::Duration;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-pub mod fighters;
-use fighters::*;
+pub mod fighters_movement_graph;
+use fighters_movement_graph::*;
 pub mod controls;
 use controls::*;
 pub mod datatypes;
 use datatypes::*;
 pub mod statbar;
 use statbar::*;
-pub mod played_fighters;
-use played_fighters::*;
+pub mod fighters;
+use fighters::*;
 
 //scene
 const CEILING_Z : f32 = -100.0;
@@ -172,14 +172,14 @@ fn setup_game(
     let mut window = windows.single_mut();
     window.title = "pixel punch".into();
     let background_handle = asset_loading.background_sprites[0].clone();  
-    // commands.spawn(SpriteBundle {
-    //     texture: background_handle,
-    //     sprite: Sprite {
-    //         custom_size: Some(Vec2::new(window.width(), window.height())),
-    //         ..default()},
-    //     transform: Transform::from_xyz(0.0, 0.0, -NORTH_WALL_Y),
-    //     ..default()
-    // });
+    commands.spawn(SpriteBundle {
+        texture: background_handle,
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(window.width(), window.height())),
+            ..default()},
+        transform: Transform::from_xyz(0.0, 0.0, -NORTH_WALL_Y),
+        ..default()
+    });
 
     //build texture atlases for all fighters
     let mut fighters_movement_animation_indicies = FightersMovementAnimationIndicies(HashMap::new());
@@ -206,36 +206,29 @@ fn setup_game(
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
         sprite: TextureAtlasSprite::default(),
         ..default()};
-    let fighter_id = commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
+    let mut movement_stack = FighterMovementStack::new(10);
+        movement_stack.push(FighterMovement::InAir);
+    let fighter_id = commands.spawn(ControlledFighterBundle{
                                         player : player,
-                                        fighter : fighter,
-                                        position : FighterPosition{x : WEST_WALL_X + 200.0, y :0.0, z : CEILING_Z},
-                                        velocity : FighterVelocity{x : 0.0, y : 0.0, z: -JUMPING_SPEED},
-                                        ..default()}).id();
-    
-    commands.spawn(StatBar::new(Color::rgb(1.0,0.0,0.0),
-                                        Color::rgb(0.0,0.0,0.0),
+                                        controls : PlayerControls::default(),
+                                        fighter_bundle : FighterBundle {
+                                            fighter: fighter,
+                                            health : FighterHealth{current : 100.0, max : 100.0},
+                                            position : FighterPosition{x : 0.0, y :0.0, z : 0.0},
+                                            velocity : FighterVelocity{x : 0.0, y :0.0, z :0.0},
+                                            movement_stack : movement_stack,
+                                            event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
+                                            sprite : sprite_sheet_bundle,
+                                    }
+    }).id();
+    commands.spawn(StatBarBundle::new(Color::rgb(0.0, 1.0, 0.0),
                                         100.0,
                                         10.0,
-                                        Vec2::new(-100.0, 0.0),
+                                        Vec2::new(-100.0, 100.0),
                                         false,
                                         false,
-                                        1.0,
-                                        fighter_id));
-    // commands.spawn(SpriteBundle {
-    //     sprite: Sprite {
-    //         color : Color::rgb(1.0,0.0,0.0),
-    //         flip_x : false,
-    //         flip_y : false,
-    //         rect : Some(Rect {min :  Vec2::new(0.0, 0.0), max : Vec2::new(500.0, 500.0),}),
-
-    //         anchor : bevy::sprite::Anchor::TopLeft,
-    //         ..default()
-    //     },
-    //     transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
-    //     // visibility: if hide {Visibility::Hidden} else {Visibility::Visible},
-    //     ..default()
-    // }).set_parent(fighter_id);
+                                        fighter_id,
+                                        0.0));
 
     // player2
     // let player = Player::Player2;

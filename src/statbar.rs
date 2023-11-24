@@ -1,80 +1,81 @@
 use bevy::prelude::*;
 
-#[derive(Bundle)]
-pub struct StatBar
-{
-    sprite_bundle: SpriteBundle,
-    target_id: PlayerBundle,
+#[derive(Component)]
+pub struct StatBarData {
+    max_length: f32,
+    thickness: f32,
+    displacement: Vec2,
+    reverse: bool,
+    hide: bool,
+    entity : Entity,
+    z : f32,
 }
 
-impl StatBar
+#[derive(Bundle)]
+pub struct StatBarBundle
+{
+    sprite_bundle: SpriteBundle,
+    data : StatBarData,
+}
+
+impl StatBarBundle
 {
     pub fn new(
         color: Color,
-        empty_color : Color,
+        // empty_color : Color,
         length: f32,
         thickness: f32,
         displacement: Vec2,
         reverse: bool,
         hide: bool,
-        value : f32,
         target_id: Entity,
+        z : f32,
     ) -> Self
     {
-        // let fixed_x_displacement: f32;
-        // if reverse {fixed_x_displacement = displacement.x + length;
-        // } else {fixed_x_displacement = displacement.x;}
-        
+        let fixed_x_displacement: f32;
+        if reverse {fixed_x_displacement = displacement.x + length;
+        } else {fixed_x_displacement = displacement.x;}
+
         Self {
-            // sprite_bundle: SpriteBundle {
-            //     sprite: Sprite {
-            //         color : Color::rgb(1.0,0.0,0.0),
-            //         flip_x : reverse,
-            //         flip_y : false,
-            //         // rect : Some(Rect {min :  Vec2::new(0.0, 0.0), max : Vec2::new(length * value, thickness),}),
-
-            //         anchor : bevy::sprite::Anchor::Center,
-            //         custom_size: Some(Vec2::new(50.0, 1000.0)),
-            //         ..default()
-            //     },
-            //     transform: Transform::from_translation(Vec3::new(displacement.x, displacement.y, 0.0)),
-            //     // visibility: if hide {Visibility::Hidden} else {Visibility::Visible},
-            //     ..default()
-            // },
-
             sprite_bundle: SpriteBundle {
                 sprite: Sprite {
-                    color : Color::rgb(1.0,0.0,0.0),
-                    flip_x : false,
+                    color : color,
+                    flip_x : reverse,
                     flip_y : false,
-                    // rect : Some(Rect {min :  Vec2::new(0.0, 0.0), max : Vec2::new(length * value, thickness),}),
-        
-                    anchor : bevy::sprite::Anchor::Center,
-                    custom_size: Some(Vec2::new(50.0, 1000.0)),
+                    rect : Some(Rect {min :  Vec2::new(0.0, 0.0), max : Vec2::new(length, thickness),}),
+                    anchor : bevy::sprite::Anchor::TopLeft,
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
-                // visibility: if hide {Visibility::Hidden} else {Visibility::Visible},
+                transform: Transform::from_translation(Vec3::new(fixed_x_displacement, displacement.y, z)),
                 ..default()
             },
-            target_id,
+            data : StatBarData {
+                max_length : length,
+                thickness : thickness,
+                displacement : displacement,
+                reverse : reverse,
+                hide : hide,
+                entity : target_id,
+                z : z,
+            }
         }
     }
 
-    pub fn update_value(&mut self, value: f32)
+    pub fn set_value(&mut self, value: f32)
     {
         if value < 0.0 || value > 1.0 {
             panic!("Statbar value is {}, but must be between 0.0 and 1.0", value)
         }
 
-        // self.sprite_bundle.sprite.rect = Some(Rect {
-        //      min :  Vec2::new(0.0, 0.0),
-        //      max : Vec2::new(self.length * self.value, self.thickness),
-        // });
+        self.sprite_bundle.sprite.rect = Some(Rect {
+             min :  Vec2::new(0.0, 0.0),
+             max : Vec2::new(self.data.max_length * value, self.data.thickness),
+        });
     }
 
-    pub fn update_hidden(&mut self, hide: bool)
+    pub fn hide(&mut self, hide: bool)
     {
+        self.data.hide = hide;
         self.sprite_bundle.visibility = if hide {Visibility::Hidden} else {Visibility::Visible};
     }
 }
