@@ -221,15 +221,20 @@ fn setup_game(
                                             sprite : sprite_sheet_bundle,
                                     }
     }).id();
-    commands.spawn(StatBarBundle::new(Color::rgb(0.0, 1.0, 0.0),
-                                        100.0,
-                                        10.0,
-                                        Vec2::new(-100.0, 100.0),
-                                        false,
-                                        false,
-                                        fighter_id,
-                                        0.0));
 
+    commands.spawn(StatBarBundle::new(Color::rgb(0.0, 1.0, 0.0),
+                                        window.width()/3.0,
+                                        window.height()/20.0,
+                                        Vec2::new(
+                                            -window.width()/2.0 + window.width()* 0.02,
+                                            -window.height()/2.0 + window.height() * 0.95),
+                                        false,
+                                        false,
+                                        0.0,
+                                        fighter_id,
+                                        None));
+
+                                        
     // player2
     // let player = Player::Player2;
     // let fighter = Fighter::HAMAS;
