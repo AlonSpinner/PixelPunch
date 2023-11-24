@@ -17,6 +17,8 @@ pub mod datatypes;
 use datatypes::*;
 pub mod statbar;
 use statbar::*;
+pub mod played_fighters;
+use played_fighters::*;
 
 //scene
 const CEILING_Z : f32 = -100.0;
@@ -67,53 +69,7 @@ pub enum AppState {
     InGame,
 }
 
-#[derive(Component)]
-enum Player{
-    Player1,
-    Player2,
-}
 
-#[derive(Bundle)]
-struct PlayerBundle{
-    player: Player,
-    fighter: Fighter,
-    health: FighterHealth,
-    position: FighterPosition,
-    velocity: FighterVelocity,
-    movement_stack : FighterMovementStack,
-    event_keytargetset_stack : KeyTargetSetStack,
-    sprite: SpriteSheetBundle,
-    controls: PlayerControls,
-    health_bar : StatBarBundle,
-}
-
-impl Default for PlayerBundle {
-    fn default() -> Self {
-        let mut movement_stack = FighterMovementStack::new(10);
-        movement_stack.0.push(FighterMovement::InAir);
-
-        Self{
-            player: Player::Player1,
-            fighter: Fighter::IDF,
-            health : FighterHealth{current : 100.0, max : 100.0},
-            position : FighterPosition{x : 0.0, y :0.0, z : 0.0},
-            velocity : FighterVelocity{x : 0.0, y :0.0, z :0.0},
-            movement_stack : movement_stack,
-            event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
-            sprite : SpriteSheetBundle::default(),
-            controls : PlayerControls::default(),
-            health_bar : StatBarBundle::new(
-                                        Color::rgb(0.0, 1.0, 0.0),
-                                        Color::rgb(0.0, 0.0, 0.0),
-                                        1000.0,
-                                        100.0,
-                                        Vec2::new(0.0, 0.0),
-                                        false,
-                                        false,
-                                        1.0),
-        }
-    }
-}
 
 #[derive(Resource, Deref, DerefMut)]
 struct AnimationTimer(Timer);
@@ -243,45 +199,6 @@ fn setup_game(
         fighters_movement_animation_indicies.0.insert(*fighter, fighter_animation_hash);
     }
 
-    // Rectangle
-    // commands.spawn(SpriteBundle {
-    //     sprite: Sprite {
-    //         color: Color::rgb(0.25, 0.25, 0.75),
-    //         custom_size: Some(Vec2::new(50.0, 100.0)),
-    //         ..default()
-    //     },
-    //     transform: Transform::from_translation(Vec3::new(-50., 0., 0.)),
-    //     ..default()
-    // });
-
-    //My Rectangle
-    // commands.spawn(SpriteBundle {
-    //     sprite: Sprite {
-    //         color : Color::rgb(1.0,0.0,0.0),
-    //         flip_x : false,
-    //         flip_y : false,
-    //         // rect : Some(Rect {min :  Vec2::new(0.0, 0.0), max : Vec2::new(length * value, thickness),}),
-
-    //         anchor : bevy::sprite::Anchor::Center,
-    //         custom_size: Some(Vec2::new(50.0, 1000.0)),
-    //         ..default()
-    //     },
-    //     transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
-    //     // visibility: if hide {Visibility::Hidden} else {Visibility::Visible},
-    //     ..default()
-    // });
-
-    commands.spawn(StatBarBundle::new(
-        Color::rgb(0.0, 1.0, 0.0),
-        Color::rgb(0.0, 0.0, 0.0),
-        1000.0,
-        100.0,
-        Vec2::new(0.0, 0.0),
-        false,
-        false,
-        1.0,
-    ));
-
     //player1
     let player = Player::Player1;
     let fighter = FIGHTERS[0];
@@ -289,12 +206,36 @@ fn setup_game(
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
         sprite: TextureAtlasSprite::default(),
         ..default()};
-    commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
+    let fighter_id = commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
                                         player : player,
                                         fighter : fighter,
                                         position : FighterPosition{x : WEST_WALL_X + 200.0, y :0.0, z : CEILING_Z},
                                         velocity : FighterVelocity{x : 0.0, y : 0.0, z: -JUMPING_SPEED},
-                                        ..default()});
+                                        ..default()}).id();
+    
+    commands.spawn(StatBar::new(Color::rgb(1.0,0.0,0.0),
+                                        Color::rgb(0.0,0.0,0.0),
+                                        100.0,
+                                        10.0,
+                                        Vec2::new(-100.0, 0.0),
+                                        false,
+                                        false,
+                                        1.0,
+                                        fighter_id));
+    // commands.spawn(SpriteBundle {
+    //     sprite: Sprite {
+    //         color : Color::rgb(1.0,0.0,0.0),
+    //         flip_x : false,
+    //         flip_y : false,
+    //         rect : Some(Rect {min :  Vec2::new(0.0, 0.0), max : Vec2::new(500.0, 500.0),}),
+
+    //         anchor : bevy::sprite::Anchor::TopLeft,
+    //         ..default()
+    //     },
+    //     transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
+    //     // visibility: if hide {Visibility::Hidden} else {Visibility::Visible},
+    //     ..default()
+    // }).set_parent(fighter_id);
 
     // player2
     // let player = Player::Player2;
@@ -501,14 +442,14 @@ fn update_state(mut query: Query<(&Fighter,
     }
 }
 
-fn update_healthbars(mut query: Query<(&FighterHealth,
-                                    &mut StatBarBundle,)>) {
-    for (health,
-        mut statbar) in query.iter_mut() {
+// fn update_healthbars(mut query: Query<(&FighterHealth,
+//                                     &mut StatBarBundle,)>) {
+//     for (health,
+//         mut statbar) in query.iter_mut() {
  
-        statbar.update_value(health.current/health.max);
-    }
-}
+//         statbar.update_value(health.current/health.max);
+//     }
+// }
 
 fn draw_fighters(time: Res<Time>,
                 fighters_movement_animation_indicies: Res<FightersMovementAnimationIndicies>,

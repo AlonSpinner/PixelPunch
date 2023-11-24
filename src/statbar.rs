@@ -1,12 +1,13 @@
 use bevy::prelude::*;
 
-#[derive(Component)]
-pub struct StatBarBundle
+#[derive(Bundle)]
+pub struct StatBar
 {
     sprite_bundle: SpriteBundle,
+    target_id: PlayerBundle,
 }
 
-impl StatBarBundle
+impl StatBar
 {
     pub fn new(
         color: Color,
@@ -17,6 +18,7 @@ impl StatBarBundle
         reverse: bool,
         hide: bool,
         value : f32,
+        target_id: Entity,
     ) -> Self
     {
         // let fixed_x_displacement: f32;
@@ -54,7 +56,8 @@ impl StatBarBundle
                 transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
                 // visibility: if hide {Visibility::Hidden} else {Visibility::Visible},
                 ..default()
-            }
+            },
+            target_id,
         }
     }
 
