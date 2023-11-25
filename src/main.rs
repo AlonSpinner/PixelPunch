@@ -55,7 +55,7 @@ fn main() {
     .add_systems(
         PostUpdate,
         (draw_fighters,
-                // update_healthbars
+                update_healthbars
                 ).run_if(in_state(AppState::InGame)),
     )
     .add_systems(Update, bevy::window::close_on_esc)
@@ -199,9 +199,13 @@ fn setup_game(
         fighters_movement_animation_indicies.0.insert(*fighter, fighter_animation_hash);
     }
 
-    //player1
-    let player = Player::Player1;
-    let fighter = FIGHTERS[0];
+    let mut spawn_fighter = |player : Player,
+                                            player_controls : PlayerControls,
+                                            fighter : Fighter,
+                                            position : FighterPosition,
+                                            health_bar_x : f32,
+                                            health_bar_reverse : bool| {
+
     let sprite_sheet_bundle = SpriteSheetBundle {
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
         sprite: TextureAtlasSprite::default(),
@@ -210,11 +214,11 @@ fn setup_game(
         movement_stack.push(FighterMovement::InAir);
     let fighter_id = commands.spawn(ControlledFighterBundle{
                                         player : player,
-                                        controls : PlayerControls::default(),
+                                        controls : player_controls,
                                         fighter_bundle : FighterBundle {
                                             fighter: fighter,
                                             health : FighterHealth{current : 100.0, max : 100.0},
-                                            position : FighterPosition{x : 0.0, y :0.0, z : 0.0},
+                                            position : position,
                                             velocity : FighterVelocity{x : 0.0, y :0.0, z :0.0},
                                             movement_stack : movement_stack,
                                             event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
@@ -227,41 +231,39 @@ fn setup_game(
                                         window.width()/3.0,
                                         window.height()/20.0,
                                         Vec2::new(
-                                            -window.width()/2.0 + window.width()* 0.02,
+                                            health_bar_x,
                                             -window.height()/2.0 + window.height() * 0.95),
-                                        false,
+                                        health_bar_reverse,
                                         false,
                                         fighter_id,
                                         0.0);
     let bar_id = commands.spawn(bar_bundle).id();
     commands.spawn(empty_bundle).set_parent(bar_id);
-    
-                                
-    // player2
-    // let player = Player::Player2;
-    // let fighter = Fighter::HAMAS;
-    // let player2_controls = PlayerControls{
-    //     up: KeyCode::Up,
-    //     down: KeyCode::Down,
-    //     left: KeyCode::Left,
-    //     right: KeyCode::Right,
-    //     attack: KeyCode::Period,
-    //     jump: KeyCode::Comma,
-    //     defend: KeyCode::M
-    // };
+    };
 
-    // let sprite_sheet_bundle = SpriteSheetBundle {
-    //     texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
-    //     sprite: TextureAtlasSprite{flip_x : true, ..default()},
-    //     ..default()};
-    // commands.spawn(PlayerBundle{sprite : sprite_sheet_bundle,
-    //                                     player : player,
-    //                                     fighter : fighter,
-    //                                     position : FighterPosition{x : EAST_WALL_X - 200.0, y :0.0, z : CEILING_Z},
-    //                                     velocity : FighterVelocity{x : 0.0, y : 0.0, z : -JUMPING_SPEED},
-    //                                     controls: player2_controls,
-    //                                     ..default()});
-    
+    spawn_fighter(Player::Player1,
+        PlayerControls::default(),
+        FIGHTERS[0],
+        FighterPosition { x: -window.width() * 0.4, y: 0.0, z: 0.0 },
+        -window.width()/2.0 + window.width()* 0.02,
+        false
+    );
+
+    spawn_fighter(Player::Player2,
+        PlayerControls{
+            up: KeyCode::Up,
+            down: KeyCode::Down,
+            left: KeyCode::Left,
+            right: KeyCode::Right,
+            attack: KeyCode::Period,
+            jump: KeyCode::Comma,
+            defend: KeyCode::M
+        },
+        FIGHTERS[1],
+        FighterPosition { x: window.width() * 0.4, y: 0.0, z: 0.0 },
+        window.width()/2.0 - window.width()* 0.02,
+        true
+    );
     
     //insert resources
     commands.insert_resource(AnimationTimer(Timer::from_seconds(ANIMATION_TIME, TimerMode::Repeating)));
@@ -281,7 +283,6 @@ fn enter_requested_node<T>(request_movement_nodes : Vec<&Arc<T>>,
             let new_movement_node: &&Arc<T> = &request_movement_nodes[0];
             movement_stack.push(new_movement_node.movement());
             new_movement_node.state_enter(position, velocity);
-            info!("entered movement {:?}", new_movement_node.movement());
             true
         }
         _ => {
@@ -442,14 +443,20 @@ fn update_state(mut query: Query<(&Fighter,
     }
 }
 
-// fn update_healthbars(mut query: Query<(&FighterHealth,
-//                                     &mut StatBarBundle,)>) {
-//     for (health,
-//         mut statbar) in query.iter_mut() {
- 
-//         statbar.update_value(health.current/health.max);
-//     }
-// }
+fn update_healthbars(mut fighter_health_query: Query<&mut FighterHealth>,
+                        mut statbar_query : Query<(&StatBarData, &mut Sprite)>) {
+    for (data,
+         mut sprite) in statbar_query.iter_mut() {
+        if let Ok(mut health) = fighter_health_query.get_mut(data.target_entity) {
+            health.current = (health.current - 1.0).max(0.0);
+            let value = health.current/health.max;
+            sprite.rect = Some(Rect {
+                min :  Vec2::new(0.0, 0.0),
+                max : Vec2::new(data.max_length * value, data.thickness),
+           });
+        }
+    }
+}
 
 fn draw_fighters(time: Res<Time>,
                 fighters_movement_animation_indicies: Res<FightersMovementAnimationIndicies>,
