@@ -222,7 +222,8 @@ fn setup_game(
                                     }
     }).id();
 
-    commands.spawn(StatBarBundle::new(Color::rgb(0.0, 1.0, 0.0),
+    let (bar_bundle,empty_bundle) = StatBarBundle::new_with_emptycolor(Color::rgb(0.0, 1.0, 0.0),
+                            Color::rgb(1.0, 0.0, 0.0),
                                         window.width()/3.0,
                                         window.height()/20.0,
                                         Vec2::new(
@@ -230,11 +231,12 @@ fn setup_game(
                                             -window.height()/2.0 + window.height() * 0.95),
                                         false,
                                         false,
-                                        0.0,
                                         fighter_id,
-                                        None));
-
-                                        
+                                        0.0);
+    let bar_id = commands.spawn(bar_bundle).id();
+    commands.spawn(empty_bundle).set_parent(bar_id);
+    
+                                
     // player2
     // let player = Player::Player2;
     // let fighter = Fighter::HAMAS;

@@ -1,18 +1,18 @@
 use bevy::prelude::*;
 
 #[derive(Component)]
-pub struct StatBarData {
+struct StatBarData {
     max_length: f32,
     thickness: f32,
-    hide: bool,
-    entity : Entity,
+    target_id : Entity,
+
 }
 
 #[derive(Bundle)]
 pub struct StatBarBundle
 {
     sprite_bundle: SpriteBundle,
-    data : StatBarData,
+    pub data : StatBarData,
 }
 
 impl StatBarBundle
@@ -26,7 +26,6 @@ impl StatBarBundle
         hide: bool,
         z : f32,
         target_id: Entity,
-        border_id: Option<Entity>,
     ) -> Self
     {
         let fixed_x_displacement: f32;
@@ -44,20 +43,20 @@ impl StatBarBundle
                     ..default()
                 },
                 transform: Transform::from_translation(Vec3::new(fixed_x_displacement, displacement.y, z)),
+                visibility : if hide {Visibility::Hidden} else {Visibility::Visible},
                 ..default()
             },
             data : StatBarData {
                 max_length : max_length,
                 thickness : thickness,
-                hide : hide,
-                entity : target_id,
+                target_id : target_id,
             }
         }
     }
 
-    pub fn new_with_border(
+    pub fn new_with_emptycolor(
         bar_color: Color,
-        border_color : Color,
+        empty_color : Color,
         max_length: f32,
         thickness: f32,
         displacement: Vec2,
@@ -65,16 +64,8 @@ impl StatBarBundle
         hide: bool,
         target_id: Entity,
         z : f32,
-        border_size : f32,
-    ) -> (Self, StatBarBorderBundle)
+    ) -> (Self, StatBarEmptyBundle)
     {
-
-        let border = StatBarBorderBundle::new(border_color,
-            max_length,
-           thickness,
-           z,
-           border_size);
-
         let bar = Self::new(bar_color,
             max_length,
             thickness,
@@ -82,10 +73,14 @@ impl StatBarBundle
             reverse,
             hide,
             z,
-            target_id,
-            None);
+            target_id);
 
-        (bar, border)
+        let empty = StatBarEmptyBundle::new(empty_color,
+            max_length,
+            thickness,
+            z);
+
+        (bar, empty)
     }
 
     pub fn set_value(&mut self, value: f32)
@@ -102,37 +97,39 @@ impl StatBarBundle
 
     pub fn hide(&mut self, hide: bool)
     {
-        self.data.hide = hide;
         self.sprite_bundle.visibility = if hide {Visibility::Hidden} else {Visibility::Visible};
     }
 }
 
 #[derive(Bundle)]
-pub struct StatBarBorderBundle
+pub struct StatBarEmptyBundle
 {
     sprite_bundle: SpriteBundle,
 }
 
-impl StatBarBorderBundle {
-    pub fn new(color : Color, bar_max_length : f32, bar_thickness : f32, bar_z : f32, border_size : f32) -> Self {
-        let dz = 1.0;
+impl StatBarEmptyBundle {
+    pub fn new(color : Color, bar_max_length : f32, bar_thickness : f32, bar_z : f32) -> Self {
+        let dz = -1.0;
         Self {
             sprite_bundle: SpriteBundle {
                 sprite: Sprite {
                     color : color,
                     flip_x : false,
                     flip_y : false,
-                    rect : Some(Rect {min :  Vec2::new(-border_size,
-                                                         -border_size),
-                                    max : Vec2::new(bar_max_length + border_size,
-                                         bar_thickness + border_size),}),
+                    rect : Some(Rect {min :  Vec2::new(0.0, 0.0),
+                                    max : Vec2::new(bar_max_length, bar_thickness),}),
                     anchor : bevy::sprite::Anchor::TopLeft,
                     ..default()
                 },
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, bar_z - dz)),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, bar_z + dz)),
                 ..default()
             },
     }
 }
+
+    pub fn hide(&mut self, hide: bool)
+    {
+        self.sprite_bundle.visibility = if hide {Visibility::Hidden} else {Visibility::Visible};
+    }
 }
 
