@@ -204,7 +204,8 @@ fn setup_game(
                                             fighter : Fighter,
                                             position : FighterPosition,
                                             health_bar_x : f32,
-                                            health_bar_reverse : bool| {
+                                            health_bar_reverse : bool,
+                                            looking_right : bool,| {
 
     let sprite_sheet_bundle = SpriteSheetBundle {
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
@@ -222,6 +223,7 @@ fn setup_game(
                                             health : FighterHealth{current : 100.0, max : 100.0},
                                             position : position,
                                             velocity : FighterVelocity{x : 0.0, y :0.0, z :0.0},
+                                            looking_right : LookingRight(looking_right),
                                             movement_stack : movement_stack,
                                             event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
                                             sprite : sprite_sheet_bundle,
@@ -248,7 +250,8 @@ fn setup_game(
         FIGHTERS[0],
         FighterPosition { x: -window.width() * 0.4, y: 0.0, z: 0.0 },
         -window.width()/2.0 + window.width()* 0.02,
-        false
+        false,
+        true
     );
 
     spawn_fighter(Player::Player2,
@@ -264,7 +267,8 @@ fn setup_game(
         FIGHTERS[1],
         FighterPosition { x: window.width() * 0.4, y: 0.0, z: 0.0 },
         window.width()/2.0 - window.width()* 0.02,
-        true
+        true,
+        false
     );
     
     //insert resources
