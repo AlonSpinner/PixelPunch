@@ -1,10 +1,7 @@
-use super::datatypes::{TimeTaggedStack,TimeTaggedValue};
 use super::controls::{KeyTargetSet,KeyTarget,KeyTargetSetStack};
-use super::fighters::{Fighter,FighterPosition,FighterVelocity,FighterMovementStack,FighterMovement};
+use super::fighters::{Fighter,FighterPosition,FighterVelocity,FighterMovementStack,FighterMovement, HitBox};
 
-use bevy::prelude::*;
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::sync::Arc;
 use once_cell::sync::Lazy;
 
@@ -20,8 +17,6 @@ pub static FIGHTERS_MOVEMENT_GRAPH : Lazy<HashMap<Fighter, FighterMovementMap>> 
     hashmap.insert(Fighter::HAMAS, FighterMovementMap::default().ensure_must_exists_movements());
     hashmap
     });
-
-pub struct HitBox;
 
 pub struct DurationAndFallback {
     pub duration : f32,
@@ -254,8 +249,8 @@ impl Default for FighterMovementMap {
                 state_enter: |_,vel| {vel.x = 0.0; vel.y = 0.0}, 
             },
             player_can_enter: |floor_z,z| floor_z == z,
-            hit_box: HitBox,
-            hurt_box: HitBox
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default()
         });
 
          map.insert_to_uncontrollable_map(UncontrollableFighterMovementNode {
@@ -271,8 +266,8 @@ impl Default for FighterMovementMap {
                  state_enter: |_,_| {}, 
              },
              player_can_enter: |floor_z,z| floor_z != z,
-             hit_box: HitBox,
-             hurt_box: HitBox
+             hit_box: HitBox::default(),
+             hurt_box: HitBox::default()
         });
                     
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Right]),
@@ -290,8 +285,8 @@ impl Default for FighterMovementMap {
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
             player_can_exit: |_,_,_,_| true,
-            hit_box: HitBox,
-            hurt_box: HitBox, 
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default(), 
         });
 
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Left]),
@@ -309,8 +304,8 @@ impl Default for FighterMovementMap {
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
             player_can_exit: |_,_,_,_| true,
-            hit_box: HitBox,
-            hurt_box: HitBox, 
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default(), 
         });
 
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Up]),
@@ -328,8 +323,8 @@ impl Default for FighterMovementMap {
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
             player_can_exit: |_,_,_,_| true,
-            hit_box: HitBox,
-            hurt_box: HitBox, 
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default(), 
         });
 
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Down]),
@@ -347,8 +342,8 @@ impl Default for FighterMovementMap {
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
             player_can_exit: |_,_,_,_| true,
-            hit_box: HitBox,
-            hurt_box: HitBox, 
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default(), 
         });
 
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Up,KeyTarget::Right]),
@@ -367,8 +362,8 @@ impl Default for FighterMovementMap {
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
             player_can_exit: |_,_,_,_| true,
-            hit_box: HitBox,
-            hurt_box: HitBox, 
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default(), 
         });
 
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Up,KeyTarget::Left]),
@@ -387,8 +382,8 @@ impl Default for FighterMovementMap {
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
             player_can_exit: |_,_,_,_| true,
-            hit_box: HitBox,
-            hurt_box: HitBox, 
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default(), 
         });
 
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Down,KeyTarget::Right]),
@@ -407,8 +402,8 @@ impl Default for FighterMovementMap {
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
             player_can_exit: |_,_,_,_| true,
-            hit_box: HitBox,
-            hurt_box: HitBox, 
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default(), 
         });
 
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Down,KeyTarget::Left]),
@@ -427,8 +422,8 @@ impl Default for FighterMovementMap {
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
             player_can_exit: |_,_,_,_| true,
-            hit_box: HitBox,
-            hurt_box: HitBox, 
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default(), 
         });
 
         map.insert_to_event_map(KeyTargetSet::from([KeyTarget::JumpJustPressed]),
@@ -622,8 +617,8 @@ impl Default for FighterMovementMap {
              },
              player_can_enter: |floor_z, position_z| floor_z == position_z,
              player_can_exit: |_,_,_,_| true,
-             hit_box: HitBox,
-             hurt_box: HitBox, 
+             hit_box: HitBox::default(),
+             hurt_box: HitBox::default(), 
          });
 
          map.insert_to_event_map(KeyTargetSet::from([KeyTarget::AttackJustPressed]),

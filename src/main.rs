@@ -217,6 +217,8 @@ fn setup_game(
                                         controls : player_controls,
                                         fighter_bundle : FighterBundle {
                                             fighter: fighter,
+                                            hitbox: FighterHitBox::default(),
+                                            hurtbox: FighterHurtBox::default(),
                                             health : FighterHealth{current : 100.0, max : 100.0},
                                             position : position,
                                             velocity : FighterVelocity{x : 0.0, y :0.0, z :0.0},
@@ -411,6 +413,9 @@ fn player_control(mut query: Query<(&Fighter,
 fn update_state(mut query: Query<(&Fighter,
                                     &mut FighterPosition,
                                     &mut FighterVelocity,
+                                    &mut FighterHealth,
+                                    &FighterHitBox,
+                                    &FighterHurtBox,
                                     &mut FighterMovementStack,)>,
                                     time: Res<Time>,) {
     let dt = time.delta_seconds();
@@ -418,6 +423,9 @@ fn update_state(mut query: Query<(&Fighter,
     for (fighter,
         mut position,
         mut velocity,
+        mut health,
+        hitbox,
+        hurtbox,
         mut movement_stack) in query.iter_mut() {
 
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter)
@@ -443,12 +451,11 @@ fn update_state(mut query: Query<(&Fighter,
     }
 }
 
-fn update_healthbars(mut fighter_health_query: Query<&mut FighterHealth>,
+fn update_healthbars(fighter_health_query: Query<&FighterHealth>,
                         mut statbar_query : Query<(&StatBarData, &mut Sprite)>) {
     for (data,
          mut sprite) in statbar_query.iter_mut() {
-        if let Ok(mut health) = fighter_health_query.get_mut(data.target_entity) {
-            health.current = (health.current - 1.0).max(0.0);
+        if let Ok(health) = fighter_health_query.get(data.target_entity) {
             let value = health.current/health.max;
             sprite.rect = Some(Rect {
                 min :  Vec2::new(0.0, 0.0),
