@@ -1,5 +1,5 @@
 use super::controls::{KeyTargetSet,KeyTarget,KeyTargetSetStack};
-use super::fighters::{Fighter,FighterPosition,FighterVelocity,FighterMovementStack,FighterMovement, HitBox};
+use super::fighters::{Fighter,FighterPosition,FighterVelocity, FacingEast, FighterMovementStack,FighterMovement, HitBox};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -31,7 +31,8 @@ pub struct FighterMovementNodeBase {
                     fighter_velocity : &mut FighterVelocity,
                     delta_time : f32),
     pub state_enter : fn(fighter_position : &mut FighterPosition,
-                   fighter_velocity : &mut FighterVelocity),
+                   fighter_velocity : &mut FighterVelocity,
+                   facing_east : &mut FacingEast),
 }
 
 pub struct EventFighterMovementNode {
@@ -72,7 +73,8 @@ pub struct UncontrollableFighterMovementNode {
 pub trait FighterMovementNodeTrait {
     fn movement(&self) -> FighterMovement;
     fn state_enter(&self, fighter_position : &mut FighterPosition,
-                        fighter_velocity : &mut FighterVelocity) -> ();
+                        fighter_velocity : &mut FighterVelocity,
+                        facing_east : &mut FacingEast) -> ();
     fn state_update(&self, fighter_position : &mut FighterPosition,
                         fighter_velocity : &mut FighterVelocity,
                         delta_time : f32) -> ();
@@ -85,8 +87,10 @@ macro_rules! impl_fighter_movement_node_trait {
             fn movement(&self) -> FighterMovement {
                 self.base.movement
             }
-            fn state_enter(&self, fighter_position: &mut FighterPosition, fighter_velocity: &mut FighterVelocity) {
-                (self.base.state_enter)(fighter_position, fighter_velocity);
+            fn state_enter(&self, fighter_position: &mut FighterPosition,
+                                 fighter_velocity: &mut FighterVelocity,
+                                 facing_east: &mut FacingEast) {
+                (self.base.state_enter)(fighter_position, fighter_velocity, facing_east);
             }
             fn state_update(&self, fighter_position: &mut FighterPosition, fighter_velocity: &mut FighterVelocity, delta_time: f32) {
                 (self.base.state_update)(fighter_position, fighter_velocity, delta_time);
@@ -133,11 +137,11 @@ impl FighterMovementNodeTrait for FighterMovementNode {
         };
     }
 
-    fn state_enter(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity) {
+    fn state_enter(&self, pos : &mut FighterPosition, vel : &mut FighterVelocity, facing_east : &mut FacingEast) {
         match self {
-            FighterMovementNode::EventTriggered(node) => {node.state_enter(pos,vel)},
-            FighterMovementNode::Persistent(node) => {node.state_enter(pos,vel)},
-            FighterMovementNode::Uncontrollable(node) => {node.state_enter(pos,vel)}
+            FighterMovementNode::EventTriggered(node) => {node.state_enter(pos,vel, facing_east)},
+            FighterMovementNode::Persistent(node) => {node.state_enter(pos,vel, facing_east)},
+            FighterMovementNode::Uncontrollable(node) => {node.state_enter(pos,vel, facing_east)}
         };
     }
 }
@@ -246,7 +250,7 @@ impl Default for FighterMovementMap {
                 movement: FighterMovement::Idle,
                 sprite_name: "Idle".to_string(),
                 state_update: |_,_,_| {},
-                state_enter: |_,vel| {vel.x = 0.0; vel.y = 0.0}, 
+                state_enter: |_,vel,_| {vel.x = 0.0; vel.y = 0.0}, 
             },
             player_can_enter: |floor_z,z| floor_z == z,
             hit_box: HitBox::default(),
@@ -263,7 +267,7 @@ impl Default for FighterMovementMap {
                     pos.z += vel.z*dt;
                     vel.z += GRAVITY*dt;
                  },
-                 state_enter: |_,_| {}, 
+                 state_enter: |_,_,_| {}, 
              },
              player_can_enter: |floor_z,z| floor_z != z,
              hit_box: HitBox::default(),
@@ -278,9 +282,10 @@ impl Default for FighterMovementMap {
                 state_update: |pos,vel,dt| {
                     pos.x += vel.x*dt;
                 },
-                state_enter: |_,vel| {
+                state_enter: |_,vel,facing_east| {
                     vel.x = WALKING_SPEED;
                     vel.y = 0.0;
+                    facing_east.0 = true;
                     }, 
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
@@ -297,9 +302,10 @@ impl Default for FighterMovementMap {
                 state_update: |pos,vel,dt| {
                     pos.x += vel.x*dt;
                 },
-                state_enter: |_,vel| {
+                state_enter: |_,vel, facing_east| {
                     vel.x = -WALKING_SPEED;
                     vel.y = 0.0;
+                    facing_east.0 = false;
                     }, 
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
@@ -316,7 +322,7 @@ impl Default for FighterMovementMap {
                 state_update: |pos,vel,dt| {
                     pos.y += vel.y*dt;
                 },
-                state_enter: |_,vel| {
+                state_enter: |_,vel,_| {
                     vel.x = 0.0;
                     vel.y = WALKING_SPEED;
                     }, 
@@ -335,7 +341,7 @@ impl Default for FighterMovementMap {
                 state_update: |pos,vel,dt| {
                     pos.y += vel.y*dt;
                 },
-                state_enter: |_,vel| {
+                state_enter: |_,vel,_| {
                     vel.x = 0.0;
                     vel.y = -WALKING_SPEED;
                     }, 
@@ -355,9 +361,10 @@ impl Default for FighterMovementMap {
                     pos.x += vel.x*dt;
                     pos.y += vel.y*dt;
                 },
-                state_enter: |_,vel| {
+                state_enter: |_,vel,facing_east| {
                     vel.x = WALKING_SPEED/1.41;
                     vel.y = WALKING_SPEED/1.41;
+                    facing_east.0 = true;
                     }, 
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
@@ -375,9 +382,10 @@ impl Default for FighterMovementMap {
                     pos.x += vel.x*dt;
                     pos.y += vel.y*dt;
                 },
-                state_enter: |_,vel| {
+                state_enter: |_,vel,facing_east| {
                     vel.x = -WALKING_SPEED/1.41;
                     vel.y = WALKING_SPEED/1.41;
+                    facing_east.0 = false;
                     }, 
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
@@ -395,9 +403,10 @@ impl Default for FighterMovementMap {
                     pos.x += vel.x*dt;
                     pos.y += vel.y*dt;
                 },
-                state_enter: |_,vel| {
+                state_enter: |_,vel,facing_east| {
                     vel.x = WALKING_SPEED/1.41;
                     vel.y = -WALKING_SPEED/1.41;
+                    facing_east.0 = true;
                     }, 
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
@@ -415,9 +424,10 @@ impl Default for FighterMovementMap {
                     pos.x += vel.x*dt;
                     pos.y += vel.y*dt;
                 },
-                state_enter: |_,vel| {
+                state_enter: |_,vel, facing_east| {
                     vel.x = -WALKING_SPEED/1.41;
                     vel.y = -WALKING_SPEED/1.41;
+                    facing_east.0 = false;
                     }, 
             },
             player_can_enter: |floor_z, position_z| floor_z == position_z,
@@ -437,7 +447,7 @@ impl Default for FighterMovementMap {
                     pos.z += vel.z * dt;
                     vel.z += GRAVITY * dt;
                 },
-                state_enter: |_,vel| {vel.z = JUMPING_SPEED;},
+                state_enter: |_,vel,_| {vel.z = JUMPING_SPEED;},
             }, 
             player_can_enter: |floor_z,pos_z,_,_,_| floor_z == pos_z,
             player_can_exit: |floor_z,pos_z,_,movement_request| 
@@ -464,7 +474,10 @@ impl Default for FighterMovementMap {
                     pos.x += vel.x * dt;
                     pos.y += vel.y * dt;
                 },
-                state_enter: |_,vel| {vel.x = RUNNING_SPEED;},
+                state_enter: |_,vel, facing_east| {
+                    vel.x = RUNNING_SPEED;
+                    facing_east.0 = true;
+                },
             }, 
             player_can_enter: |floor_z,pos_z, fighter_movement_stack,event_keytargetset_stack,is_joined_keytargetset| {
                 if !is_joined_keytargetset {return false};
@@ -538,7 +551,10 @@ impl Default for FighterMovementMap {
                     pos.x += vel.x * dt;
                     pos.y += vel.y * dt;
                 },
-                state_enter: |_,vel| {vel.x = -RUNNING_SPEED;},
+                state_enter: |_,vel, facing_east| {
+                    vel.x = -RUNNING_SPEED;
+                    facing_east.0 = false;
+                },
             }, 
             player_can_enter: |floor_z,pos_z, fighter_movement_stack,event_keytargetset_stack,is_joined_keytargetset| {
                 if !is_joined_keytargetset {return false};
@@ -609,7 +625,7 @@ impl Default for FighterMovementMap {
                  movement: FighterMovement::Docking,
                  sprite_name: "Sliding".to_string(),
                  state_update: |_,_,_| {},
-                 state_enter: |_,vel| {
+                 state_enter: |_,vel,_| {
                      vel.x = 0.0;
                      vel.y = 0.0;
                      vel.z = 0.0;
@@ -627,7 +643,7 @@ impl Default for FighterMovementMap {
                 movement: FighterMovement::Slashing,
                 sprite_name: "Slashing".to_string(),
                 state_update: |_,_,_| {},
-                state_enter: |_,vel| {
+                state_enter: |_,vel,_| {
                     vel.x = 0.0;
                     vel.y = 0.0;
                 },
@@ -656,7 +672,7 @@ impl Default for FighterMovementMap {
                     pos.z += vel.z * dt;
                     vel.z += GRAVITY * dt;
                 },
-                state_enter: |_,_| {},
+                state_enter: |_,_,_| {},
             }, 
             player_can_enter: |floor_z,pos_z,fighter_movement_stack,_,_| {
                 if let Some(durative_movement) = fighter_movement_stack.last() {

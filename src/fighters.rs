@@ -37,7 +37,7 @@ pub struct FighterVelocity {
 }
 
 #[derive(Component)]
-pub struct LookingRight(pub bool);
+pub struct FacingEast(pub bool);
 
 pub struct HitBox {
     pub center : [f32;2], //x,y : center of hitbox
@@ -203,7 +203,7 @@ pub struct FighterBundle{
     pub hurtbox: FighterHurtBox,
     pub position: FighterPosition,
     pub velocity: FighterVelocity,
-    pub looking_right: LookingRight,
+    pub facing_east: FacingEast,
     pub movement_stack : FighterMovementStack,
     pub event_keytargetset_stack : KeyTargetSetStack,
     pub sprite: SpriteSheetBundle,

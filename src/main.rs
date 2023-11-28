@@ -205,7 +205,7 @@ fn setup_game(
                                             position : FighterPosition,
                                             health_bar_x : f32,
                                             health_bar_reverse : bool,
-                                            looking_right : bool,| {
+                                            facing_east : bool,| {
 
     let sprite_sheet_bundle = SpriteSheetBundle {
         texture_atlas: fighters_movement_animation_indicies.0.get(&fighter).unwrap().atlas_handle.clone(),
@@ -223,7 +223,7 @@ fn setup_game(
                                             health : FighterHealth{current : 100.0, max : 100.0},
                                             position : position,
                                             velocity : FighterVelocity{x : 0.0, y :0.0, z :0.0},
-                                            looking_right : LookingRight(looking_right),
+                                            facing_east : FacingEast(facing_east),
                                             movement_stack : movement_stack,
                                             event_keytargetset_stack : KeyTargetSetStack::new(10, 0.5),
                                             sprite : sprite_sheet_bundle,
@@ -281,15 +281,16 @@ fn setup_game(
 fn enter_requested_node<T>(request_movement_nodes : Vec<&Arc<T>>,
     movement_stack : &mut FighterMovementStack,
     position : &mut FighterPosition,
-    velocity: &mut FighterVelocity) -> bool 
+    velocity: &mut FighterVelocity,
+    facing_east: &mut FacingEast,) -> Option<FighterMovement>
     where T: FighterMovementNodeTrait {
     match request_movement_nodes.len() {
-        0 => false,
+        0 => None,
         1 => {
             let new_movement_node: &&Arc<T> = &request_movement_nodes[0];
             movement_stack.push(new_movement_node.movement());
-            new_movement_node.state_enter(position, velocity);
-            true
+            new_movement_node.state_enter(position, velocity, facing_east);
+            Some(new_movement_node.movement())
         }
         _ => {
             let culprit_movements = request_movement_nodes.iter()
@@ -321,7 +322,8 @@ fn player_control(mut query: Query<(&Fighter,
                                     &mut KeyTargetSetStack,
                                     &mut FighterMovementStack,
                                     &mut FighterPosition,
-                                    &mut FighterVelocity)>,
+                                    &mut FighterVelocity,
+                                    &mut FacingEast,)>,
                                     keyboard_input_resource: Res<Input<KeyCode>>,
                                     time: Res<Time>,
                                     ) {
@@ -332,7 +334,8 @@ fn player_control(mut query: Query<(&Fighter,
         mut event_keytargetset_stack,
         mut movement_stack,
         mut position,
-        mut velocity) in query.iter_mut() {
+        mut velocity,
+        mut facing_east) in query.iter_mut() {
 
         let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
 
@@ -355,7 +358,8 @@ fn player_control(mut query: Query<(&Fighter,
                 let can_exit = can_exit_node(request_movement_node, current_movement_node, position.z, current_durative_movement.duration);
                 can_enter & can_exit
                 }).collect::<Vec<_>>();
-            if enter_requested_node(filtered_request_nodes, &mut movement_stack, &mut position, &mut velocity) {
+            if let Some(_) = enter_requested_node(filtered_request_nodes,
+                 &mut movement_stack, &mut position, &mut velocity, &mut facing_east) {
                 continue
             };
         }
@@ -368,7 +372,8 @@ fn player_control(mut query: Query<(&Fighter,
                 let can_exit = can_exit_node(request_movement_node, current_movement_node, position.z, current_durative_movement.duration);
                 can_enter & can_exit
                 }).collect::<Vec<_>>();
-            if enter_requested_node(filtered_request_nodes, &mut movement_stack, &mut position, &mut velocity) {
+            if let Some(_) = enter_requested_node(filtered_request_nodes,
+                 &mut movement_stack, &mut position, &mut velocity, &mut facing_east) {
                 continue
             };
         }        
@@ -386,7 +391,9 @@ fn player_control(mut query: Query<(&Fighter,
                 can_enter & can_exit
                 }).collect::<Vec<_>>();
             
-            if enter_requested_node(filtered_request_nodes,&mut movement_stack,&mut position,&mut velocity) {
+            //
+            if let Some(_) = enter_requested_node(filtered_request_nodes,
+                &mut movement_stack,&mut position,&mut velocity, &mut facing_east) {
                 continue
             };
         }
@@ -400,7 +407,7 @@ fn player_control(mut query: Query<(&Fighter,
 
             if can_enter && can_exit {
                 movement_stack.0.push(FighterMovement::Idle);
-                (idle_node.base.state_enter)(&mut position, &mut velocity);
+                (idle_node.base.state_enter)(&mut position, &mut velocity, &mut facing_east);
                 continue
             }
         }
@@ -475,7 +482,7 @@ fn draw_fighters(time: Res<Time>,
                 mut query: Query<(&Fighter,
                                 &FighterMovementStack,
                                 &FighterPosition,
-                                &FighterVelocity,
+                                Ref<FacingEast>,
                                 &mut TextureAtlasSprite,
                                 &mut Transform,)>) {
     
@@ -483,7 +490,7 @@ fn draw_fighters(time: Res<Time>,
     for (fighter,
         movement_stack,
         position,
-        velocity,
+        facing_right,
         mut sprite,
         mut transform) in query.iter_mut() {
         
@@ -505,10 +512,8 @@ fn draw_fighters(time: Res<Time>,
             let uvw = project_xyz_2_uvw(position.into());
             transform.translation = Vec3::new(uvw[0], uvw[1], uvw[2]);
     
-            if velocity.x > 0.0 {
-                sprite.flip_x = false;
-            } else if velocity.x < 0.0 {
-                sprite.flip_x = true;
+            if facing_right.is_changed() {
+                sprite.flip_x = !facing_right.0;
             }
         }
     }
