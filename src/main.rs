@@ -19,6 +19,8 @@ pub mod statbar;
 use statbar::*;
 pub mod fighters;
 use fighters::*;
+pub mod shadow;
+use shadow::*;
 
 //scene
 const CEILING_Z : f32 = -100.0;
