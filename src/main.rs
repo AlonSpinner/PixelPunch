@@ -3,6 +3,7 @@ use bevy::{prelude::*,
     //  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
     };
 use bevy_tile_atlas::TileAtlasBuilder;
+use bevy_prototype_lyon::prelude::*;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
@@ -21,6 +22,8 @@ pub mod fighters;
 use fighters::*;
 pub mod shadow;
 use shadow::*;
+pub mod utils;
+use utils::*;
 
 //scene
 const CEILING_Z : f32 = -100.0;
@@ -38,9 +41,11 @@ const FIGHTERS : [Fighter;2]= [Fighter::IDF, Fighter::HAMAS];
 fn main() {
     App::new()
     .add_plugins((DefaultPlugins.set(ImagePlugin::default_nearest()),
+                    ShapePlugin,
                     // FrameTimeDiagnosticsPlugin,
                     // LogDiagnosticsPlugin::default(),
                 ))
+    .insert_resource(Msaa::Sample4)
     .add_state::<AppState>()
     .add_systems(OnEnter(AppState::Setup), load_assets)
     .add_systems(Update, check_textures_loaded.run_if(in_state(AppState::Setup)))
@@ -57,7 +62,8 @@ fn main() {
     .add_systems(
         PostUpdate,
         (draw_fighters,
-                update_healthbars
+                update_healthbars,
+                update_shadows,
                 ).run_if(in_state(AppState::InGame)),
     )
     .add_systems(Update, bevy::window::close_on_esc)
@@ -70,8 +76,6 @@ pub enum AppState {
     Setup,
     InGame,
 }
-
-
 
 #[derive(Resource, Deref, DerefMut)]
 struct AnimationTimer(Timer);
@@ -232,7 +236,20 @@ fn setup_game(
                                     }
     }).id();
 
-    let (bar_bundle,empty_bundle) = StatBarBundle::new_with_emptycolor(Color::rgb(0.0, 1.0, 0.0),
+    // shadow
+    commands.spawn(ShadowBundle::new(Vec2::new(20.0,10.0),
+                                        -NORTH_WALL_Y,
+                                        false,
+                                        Color::rgba(0.0, 0.0, 0.0, 0.8),
+                                        Color::rgba(0.0, 0.0, 0.0, 0.0),
+                                        2.0,
+                                        fighter_id,
+                                        -32.0
+                                    ));
+
+
+    //health bar
+    let (healthbar_green_bundle,healthbar_red_bundle) = StatBarBundle::new_with_emptycolor(Color::rgb(0.0, 1.0, 0.0),
                             Color::rgb(1.0, 0.0, 0.0),
                                         window.width()/3.0,
                                         window.height()/20.0,
@@ -243,8 +260,8 @@ fn setup_game(
                                         false,
                                         fighter_id,
                                         0.0);
-    let bar_id = commands.spawn(bar_bundle).id();
-    commands.spawn(empty_bundle).set_parent(bar_id);
+    let healthbar_green_id = commands.spawn(healthbar_green_bundle).id();
+    commands.spawn(healthbar_red_bundle).set_parent(healthbar_green_id);
     };
 
     spawn_fighter(Player::Player1,
@@ -474,6 +491,17 @@ fn update_healthbars(fighter_health_query: Query<&FighterHealth>,
                 min :  Vec2::new(0.0, 0.0),
                 max : Vec2::new(data.max_length * value, data.thickness),
            });
+        }
+    }
+}
+
+fn update_shadows(query_fighter_position: Query<&FighterPosition>,
+                mut query_fighter_shadows: Query<(&mut Transform, &mut ShadowData)>) {
+    for (mut transform,
+        shadow) in query_fighter_shadows.iter_mut() {
+        if let Ok(position) = query_fighter_position.get(shadow.target_entity) {
+            let uvw = project_xyz_2_uvw([position.x, position.y, FLOOR_Z + shadow.height_offset]);
+            transform.translation = Vec3::new(uvw[0], uvw[1], shadow.z);
         }
     }
 }
