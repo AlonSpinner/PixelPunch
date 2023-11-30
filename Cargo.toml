@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bevy = { version = "0.11.3", features = ["dynamic_linking"] }
 bevy_tile_atlas = "0.7.0"
+bevy_prototype_lyon = "0.9.0"
 strum = "0.25"
 strum_macros = "0.25"
 once_cell = "1.18.0"
