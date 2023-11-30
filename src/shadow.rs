@@ -20,7 +20,6 @@ impl ShadowBundle {
     pub fn new(
         radii : Vec2,
         z : f32,
-        hide: bool,
         fill_color : Color,
         stroke_color : Color,
         stroke_width : f32,
@@ -35,8 +34,11 @@ impl ShadowBundle {
                         radii : radii,
                         center : Vec2::new(0.0, 0.0),
                     }),
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, z)),
-                visibility : if hide {Visibility::Hidden} else {Visibility::Visible},
+                spatial: SpatialBundle { 
+                    visibility: Visibility::Inherited,
+                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, z)),
+                    ..default()
+                    },
                 ..default()
                 },
             fill : Fill::color(fill_color),

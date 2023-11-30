@@ -9,6 +9,7 @@ use std::hash::Hash;
 use std::time::Duration;
 use std::path::PathBuf;
 use std::sync::Arc;
+use glob::glob;
 
 pub mod fighters_movement_graph;
 use fighters_movement_graph::*;
@@ -112,10 +113,9 @@ fn load_assets(mut commands: Commands,
         let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
         for sprite_name in fighter_movement_graph.movement_map.values().map(|x| x.sprite_name()) {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
-            let path = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name);
-            let untyped_handles = asset_server.load_folder(path).unwrap();
-            for handle in untyped_handles.iter() {
-                let image_handle = handle.clone().typed();
+            let pathbuf = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name).join("*.png");
+            for path in  glob::glob(pathbuf.to_str().unwrap()).unwrap() {
+                let image_handle = asset_server.load(path.unwrap());
                 sprites_vec.push(image_handle);
             }
         fighter_movement_sprites.insert(sprite_name.clone(), sprites_vec);
@@ -131,15 +131,16 @@ fn check_textures_loaded(
     asset_loading: Res<AssetLoading>,
 ) { 
     for sprite_handles in asset_loading.background_sprites.iter() {
-        let sprite_load_state = asset_server.get_load_state(sprite_handles);
-        match sprite_load_state {
-            LoadState::Loaded => {}
-            LoadState::NotLoaded | LoadState::Loading => {return;}
-            LoadState::Failed => {
-                panic!("Failed to load sprite");
-            }
-            _ => {
-                panic!("Unexpected load state");
+        if let Some(sprite_load_state) = asset_server.get_load_state(sprite_handles) {
+            match sprite_load_state {
+                LoadState::Loaded => {}
+                LoadState::NotLoaded | LoadState::Loading => {return;}
+                LoadState::Failed => {
+                    panic!("Failed to load sprite");
+                }
+                _ => {
+                    panic!("Unexpected load state");
+                }
             }
         }
     }
@@ -147,15 +148,16 @@ fn check_textures_loaded(
     for (_, movement_sprites_handles) in asset_loading.fighters_movement_sprites.iter() {
         for (_, sprites_handles) in movement_sprites_handles.iter() {
             for sprite_handle in sprites_handles.iter() {
-                let sprite_load_state = asset_server.get_load_state(sprite_handle);
-                match sprite_load_state {
-                    LoadState::Loaded => {}
-                    LoadState::NotLoaded | LoadState::Loading => {return;}
-                    LoadState::Failed => {
-                        panic!("Failed to load sprite");
-                    }
-                    _ => {
-                        panic!("Unexpected load state");
+                if let Some(sprite_load_state) = asset_server.get_load_state(sprite_handle) {
+                    match sprite_load_state {
+                        LoadState::Loaded => {}
+                        LoadState::NotLoaded | LoadState::Loading => {return;}
+                        LoadState::Failed => {
+                            panic!("Failed to load sprite");
+                        }
+                        _ => {
+                            panic!("Unexpected load state");
+                        }
                     }
                 }
             }
@@ -239,7 +241,6 @@ fn setup_game(
     // shadow
     commands.spawn(ShadowBundle::new(Vec2::new(20.0,10.0),
                                         -NORTH_WALL_Y,
-                                        false,
                                         Color::rgba(0.0, 0.0, 0.0, 0.8),
                                         Color::rgba(0.0, 0.0, 0.0, 0.0),
                                         2.0,
