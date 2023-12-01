@@ -112,10 +112,13 @@ fn load_assets(mut commands: Commands,
         let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
         for sprite_name in fighter_movement_graph.movement_map.values().map(|x| x.sprite_name()) {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
-            let path = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name);
-            let untyped_handles = asset_server.load_folder(path).unwrap();
-            for handle in untyped_handles.iter() {
-                let image_handle = handle.clone().typed();
+            let path = PathBuf::from("assets/textures").join(fighter.to_string()).join(sprite_name);
+            let dir = std::fs::read_dir(&path)
+                .expect(format!("Failed to read directory: {:?}", path).as_str());
+            for entry in dir{
+                let entry = entry.unwrap();
+                let path = entry.path();
+                let image_handle = asset_server.load(path.strip_prefix("assets/").unwrap());
                 sprites_vec.push(image_handle);
             }
         fighter_movement_sprites.insert(sprite_name.clone(), sprites_vec);
