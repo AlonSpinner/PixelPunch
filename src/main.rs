@@ -1,4 +1,3 @@
-use bevy::asset::AssetLoader;
 use bevy::{prelude::*,
      asset::LoadState,
     //  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
@@ -13,18 +12,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use serde_yaml;
 
+pub mod components_bundles;
+use components_bundles::*;
 pub mod fighters_movement_graph;
 use fighters_movement_graph::*;
-pub mod controls;
-use controls::*;
-pub mod datatypes;
-use datatypes::*;
-pub mod statbar;
-use statbar::*;
-pub mod fighters;
-use fighters::*;
-pub mod shadow;
-use shadow::*;
 pub mod utils;
 use utils::*;
 

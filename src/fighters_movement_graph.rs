@@ -1,5 +1,5 @@
-use super::controls::{KeyTargetSet,KeyTarget,KeyTargetSetStack};
-use super::fighters::{Fighter,FighterPosition,FighterVelocity, FacingEast, FighterMovementStack,FighterMovement, HitBox};
+use super::components_bundles::{Fighter,FighterPosition,FighterVelocity,
+    FacingEast, FighterMovementStack,FighterMovement, HitBox, KeyTargetSet,KeyTarget,KeyTargetSetStack} ;
 
 use std::collections::HashMap;
 use std::sync::Arc;
