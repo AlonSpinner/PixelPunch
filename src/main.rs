@@ -1,3 +1,4 @@
+use bevy::asset::AssetLoader;
 use bevy::{prelude::*,
      asset::LoadState,
     //  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
@@ -10,6 +11,7 @@ use std::hash::Hash;
 use std::time::Duration;
 use std::path::PathBuf;
 use std::sync::Arc;
+use serde_yaml;
 
 pub mod fighters_movement_graph;
 use fighters_movement_graph::*;
@@ -37,6 +39,9 @@ const WEST_WALL_X : f32 = -600.0;
 //controls and visuals
 const ANIMATION_TIME : f32 = 0.1;
 const FIGHTERS : [Fighter;2]= [Fighter::IDF, Fighter::HAMAS];
+
+//assets
+const YAML_DATA: &str = include_str!("../assets/assets.yaml");
 
 fn main() {
     App::new()
@@ -103,8 +108,8 @@ fn load_assets(mut commands: Commands,
         background_sprites: Vec::new(),
     };
 
-    //load assets_paths from assets/paths.rs
-    
+    let yaml : serde_yaml::Mapping = serde_yaml::from_str(YAML_DATA)
+        .expect("Failed to deserialize asset paths from YAML");
 
     //load background sprites
     assets.background_sprites.push(asset_server.load("background.png"));
@@ -115,13 +120,12 @@ fn load_assets(mut commands: Commands,
         let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
         for sprite_name in fighter_movement_graph.movement_map.values().map(|x| x.sprite_name()) {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
-            let path = PathBuf::from("assets/textures").join(fighter.to_string()).join(sprite_name);
-            let dir = std::fs::read_dir(&path)
-                .expect(format!("Failed to read directory: {:?}", path).as_str());
+            let path = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name);
+            let dir = yaml.get(path.to_str().unwrap()).unwrap().as_sequence().unwrap();
             for entry in dir{
-                let entry = entry.unwrap();
-                let path = entry.path();
-                let image_handle = asset_server.load(path.strip_prefix("assets/").unwrap());
+                let filename = entry.as_str().unwrap();
+                let fullfilename = format!("{}/{}", path.to_str().unwrap(), filename);
+                let image_handle = asset_server.load(fullfilename);
                 sprites_vec.push(image_handle);
             }
         fighter_movement_sprites.insert(sprite_name.clone(), sprites_vec);

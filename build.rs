@@ -5,25 +5,6 @@ use std::io::Write;
 use std::path::Path;
 use walkdir::WalkDir;
 
-//recursive functin to loop over files and insert into hashmap, then enter subdirs and repeat
-fn recursive_insert(dir : , hashmap: &mut HashMap<String, Vec<String>>) {
-    for entry in WalkDir::new(dir) {
-        let entry = entry?;
-        if entry.file_type().is_file() {
-            if let (Some(path), Some(parent)) = (entry.path().to_str(), entry.path().parent().and_then(|p| p.to_str())) {
-                let dir = String::from(parent.strip_prefix("assets")
-                    .expect("Failed to strip dir prefix"));
-                let filename = path.strip_prefix(parent)
-                    .expect("Failed to strip path prefix")
-                    .to_string();
-                assets_map.entry(dir).or_insert_with(Vec::new).push(filename);
-            }
-        }
-    }
-
-    hashmap.entry(key).or_insert_with(Vec::new).push(value);
-}
-
 fn main() -> std::io::Result<()> {
     let assets_dir = Path::new("assets");
     let mut assets_map: HashMap<String, Vec<String>> = HashMap::new();
@@ -32,12 +13,10 @@ fn main() -> std::io::Result<()> {
         let entry = entry?;
         if entry.file_type().is_file() {
             if let (Some(path), Some(parent)) = (entry.path().to_str(), entry.path().parent().and_then(|p| p.to_str())) {
-                let dir = String::from(parent.strip_prefix("assets")
-                    .expect("Failed to strip dir prefix"));
-                let filename = path.strip_prefix(parent)
-                    .expect("Failed to strip path prefix")
-                    .to_string();
-                assets_map.entry(dir).or_insert_with(Vec::new).push(filename);
+                let parent_key = parent.strip_prefix("assets/").unwrap_or("root/").to_string();
+                let parent_to_strip = format!("{}{}",parent,"/");
+                let path_value = path.strip_prefix(&parent_to_strip).unwrap().to_string();   
+                assets_map.entry(parent_key).or_insert_with(Vec::new).push(path_value);
             }
         }
     }
@@ -50,7 +29,7 @@ fn main() -> std::io::Result<()> {
     let yaml_string = serde_yaml::to_string(&assets_map)
         .expect("Failed to serialize asset paths to YAML");
 
-    let mut file = File::create(Path::new("assets.yaml"))?;
+    let mut file = File::create(Path::new("assets/assets.yaml"))?;
     file.write_all(yaml_string.as_bytes())?;
 
     Ok(())
