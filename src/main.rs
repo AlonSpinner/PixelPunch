@@ -4,6 +4,7 @@ use bevy::{prelude::*,
     };
 use bevy_tile_atlas::TileAtlasBuilder;
 use bevy_prototype_lyon::prelude::*;
+use bevy_embedded_assets::EmbeddedAssetPlugin;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
@@ -35,12 +36,12 @@ const WEST_WALL_X : f32 = -600.0;
 
 //controls and visuals
 const ANIMATION_TIME : f32 = 0.1;
-
 const FIGHTERS : [Fighter;2]= [Fighter::IDF, Fighter::HAMAS];
 
 fn main() {
     App::new()
-    .add_plugins((DefaultPlugins.set(ImagePlugin::default_nearest()),
+    .add_plugins((EmbeddedAssetPlugin::default(),
+                    DefaultPlugins.set(ImagePlugin::default_nearest()),
                     ShapePlugin,
                     // FrameTimeDiagnosticsPlugin,
                     // LogDiagnosticsPlugin::default(),
@@ -102,10 +103,12 @@ fn load_assets(mut commands: Commands,
         background_sprites: Vec::new(),
     };
 
+    //load assets_paths from assets/paths.rs
+    
+
     //load background sprites
     assets.background_sprites.push(asset_server.load("background.png"));
 
-    
     //load fighter sprites
     for fighter in FIGHTERS {
         let fighter_movement_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
