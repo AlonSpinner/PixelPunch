@@ -1,27 +1,21 @@
 use bevy::{prelude::*,
      asset::LoadState,
-    //  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
+     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
     };
 use bevy_tile_atlas::TileAtlasBuilder;
 use bevy_prototype_lyon::prelude::*;
+use bevy_embedded_assets::EmbeddedAssetPlugin;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 use std::path::PathBuf;
 use std::sync::Arc;
+use serde_yaml;
 
+pub mod components_bundles;
+use components_bundles::*;
 pub mod fighters_movement_graph;
 use fighters_movement_graph::*;
-pub mod controls;
-use controls::*;
-pub mod datatypes;
-use datatypes::*;
-pub mod statbar;
-use statbar::*;
-pub mod fighters;
-use fighters::*;
-pub mod shadow;
-use shadow::*;
 pub mod utils;
 use utils::*;
 
@@ -34,16 +28,19 @@ const EAST_WALL_X : f32 = 600.0;
 const WEST_WALL_X : f32 = -600.0;
 
 //controls and visuals
-const ANIMATION_TIME : f32 = 0.1;
-
+const ANIMATION_TIME : f32 = 0.05;
 const FIGHTERS : [Fighter;2]= [Fighter::IDF, Fighter::HAMAS];
+
+//assets
+const YAML_DATA: &str = include_str!("../assets/assets.yaml");
 
 fn main() {
     App::new()
-    .add_plugins((DefaultPlugins.set(ImagePlugin::default_nearest()),
+    .add_plugins((EmbeddedAssetPlugin::default(),
+                    DefaultPlugins.set(ImagePlugin::default_nearest()),
                     ShapePlugin,
-                    // FrameTimeDiagnosticsPlugin,
-                    // LogDiagnosticsPlugin::default(),
+                    FrameTimeDiagnosticsPlugin,
+                    LogDiagnosticsPlugin::default(),
                 ))
     .insert_resource(Msaa::Sample4)
     .add_state::<AppState>()
@@ -102,20 +99,28 @@ fn load_assets(mut commands: Commands,
         background_sprites: Vec::new(),
     };
 
+    let yaml : serde_yaml::Mapping = serde_yaml::from_str(YAML_DATA)
+        .expect("Failed to deserialize asset paths from YAML");
+
     //load background sprites
     assets.background_sprites.push(asset_server.load("background.png"));
 
-    
     //load fighter sprites
     for fighter in FIGHTERS {
         let fighter_movement_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
         let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
         for sprite_name in fighter_movement_graph.movement_map.values().map(|x| x.sprite_name()) {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
-            let path = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name);
-            let untyped_handles = asset_server.load_folder(path).unwrap();
-            for handle in untyped_handles.iter() {
-                let image_handle = handle.clone().typed();
+            let dirpath = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name);
+            
+            let dirvalues = yaml.get(dirpath.to_str()
+                .expect("dirpath has to contain only UTF-8 validity"))
+                .expect("yaml does not contain the key").as_sequence()
+                .expect("yaml value is not a sequence");
+            for entry in dirvalues{
+                let filename = entry.as_str().unwrap();
+                let fullfilename = format!("{}/{}", dirpath.to_str().unwrap(), filename);
+                let image_handle = asset_server.load(fullfilename);
                 sprites_vec.push(image_handle);
             }
         fighter_movement_sprites.insert(sprite_name.clone(), sprites_vec);
