@@ -3,20 +3,14 @@ use super::components_bundles::{Fighter,FighterPosition,FighterVelocity,
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
+
+use bevy::prelude::*;
 
 //movement
 pub const WALKING_SPEED : f32 = 100.0;
 pub const RUNNING_SPEED : f32 = 200.0;
 pub const JUMPING_SPEED : f32 = 200.0;
 pub const GRAVITY : f32 = -400.0;
-
-pub static FIGHTERS_MOVEMENT_GRAPH : Lazy<HashMap<Fighter, FighterMovementMap>> = Lazy::new(||{
-    let mut hashmap = HashMap::new();
-    hashmap.insert(Fighter::IDF, FighterMovementMap::default().ensure_must_exists_movements());
-    hashmap.insert(Fighter::HAMAS, FighterMovementMap::default().ensure_must_exists_movements());
-    hashmap
-    });
 
 pub struct DurationAndFallback {
     pub duration : f32,
@@ -193,7 +187,7 @@ impl FighterMovementMap {
         }
     }
 
-    fn ensure_must_exists_movements(self) -> Self{
+    pub fn ensure_must_exists_movements(self) -> Self{
         let must_exist_movements = [FighterMovement::Idle];
         for movement in must_exist_movements.iter() {
             if !self.movement_map.contains_key(movement) {
@@ -696,5 +690,17 @@ impl Default for FighterMovementMap {
          });
 
         map
+    }
+}
+
+#[derive(Resource)]
+pub struct FighterMovementMapCollection(pub HashMap<Fighter, FighterMovementMap>);
+
+impl Default for FighterMovementMapCollection {
+    fn default() -> Self {
+        let mut map = HashMap::new();
+        map.insert(Fighter::IDF, FighterMovementMap::default());
+        map.insert(Fighter::HAMAS, FighterMovementMap::default());
+        Self(map)
     }
 }
