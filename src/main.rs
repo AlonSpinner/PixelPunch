@@ -1,6 +1,6 @@
 use bevy::{prelude::*,
      asset::LoadState,
-    //  diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
+     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}
     };
 use bevy_tile_atlas::TileAtlasBuilder;
 use bevy_prototype_lyon::prelude::*;
@@ -28,7 +28,7 @@ const EAST_WALL_X : f32 = 600.0;
 const WEST_WALL_X : f32 = -600.0;
 
 //controls and visuals
-const ANIMATION_TIME : f32 = 0.1;
+const ANIMATION_TIME : f32 = 0.05;
 const FIGHTERS : [Fighter;2]= [Fighter::IDF, Fighter::HAMAS];
 
 //assets
@@ -39,8 +39,8 @@ fn main() {
     .add_plugins((EmbeddedAssetPlugin::default(),
                     DefaultPlugins.set(ImagePlugin::default_nearest()),
                     ShapePlugin,
-                    // FrameTimeDiagnosticsPlugin,
-                    // LogDiagnosticsPlugin::default(),
+                    FrameTimeDiagnosticsPlugin,
+                    LogDiagnosticsPlugin::default(),
                 ))
     .insert_resource(Msaa::Sample4)
     .add_state::<AppState>()
@@ -111,11 +111,15 @@ fn load_assets(mut commands: Commands,
         let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
         for sprite_name in fighter_movement_graph.movement_map.values().map(|x| x.sprite_name()) {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
-            let path = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name);
-            let dir = yaml.get(path.to_str().unwrap()).unwrap().as_sequence().unwrap();
-            for entry in dir{
+            let dirpath = PathBuf::from("textures").join(fighter.to_string()).join(sprite_name);
+            
+            let dirvalues = yaml.get(dirpath.to_str()
+                .expect("dirpath has to contain only UTF-8 validity"))
+                .expect("yaml does not contain the key").as_sequence()
+                .expect("yaml value is not a sequence");
+            for entry in dirvalues{
                 let filename = entry.as_str().unwrap();
-                let fullfilename = format!("{}/{}", path.to_str().unwrap(), filename);
+                let fullfilename = format!("{}/{}", dirpath.to_str().unwrap(), filename);
                 let image_handle = asset_server.load(fullfilename);
                 sprites_vec.push(image_handle);
             }
