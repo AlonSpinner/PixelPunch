@@ -14,8 +14,8 @@ use serde_yaml;
 
 pub mod components_bundles;
 use components_bundles::*;
-pub mod fighters_movement_graph;
-use fighters_movement_graph::*;
+pub mod fighters_movement_map;
+use fighters_movement_map::*;
 pub mod utils;
 use utils::*;
 
@@ -36,13 +36,14 @@ const YAML_DATA: &str = include_str!("../assets/assets.yaml");
 
 fn main() {
     App::new()
+    .insert_resource(Msaa::Sample4)
+    .insert_resource(FighterMovementMapCollection::default())
     .add_plugins((EmbeddedAssetPlugin::default(),
                     DefaultPlugins.set(ImagePlugin::default_nearest()),
                     ShapePlugin,
                     FrameTimeDiagnosticsPlugin,
                     LogDiagnosticsPlugin::default(),
                 ))
-    .insert_resource(Msaa::Sample4)
     .add_state::<AppState>()
     .add_systems(OnEnter(AppState::Setup), load_assets)
     .add_systems(Update, check_textures_loaded.run_if(in_state(AppState::Setup)))
@@ -91,7 +92,8 @@ struct FighterAnimationHash {
 struct FightersMovementAnimationIndicies(HashMap<Fighter,FighterAnimationHash>);
 
 fn load_assets(mut commands: Commands,
-                 asset_server: Res<AssetServer>) {
+                 asset_server: Res<AssetServer>,
+                 figher_movement_map_collection: Res<FighterMovementMapCollection>,) {
 
 
     let mut assets = AssetLoading {
@@ -107,7 +109,7 @@ fn load_assets(mut commands: Commands,
 
     //load fighter sprites
     for fighter in FIGHTERS {
-        let fighter_movement_graph = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+        let fighter_movement_graph = figher_movement_map_collection.0.get(&fighter).unwrap();
         let mut fighter_movement_sprites: HashMap<String,Vec<Handle<Image>>> = HashMap::new();
         for sprite_name in fighter_movement_graph.movement_map.values().map(|x| x.sprite_name()) {
             let mut sprites_vec: Vec<Handle<Image>> = Vec::new();
@@ -350,6 +352,7 @@ fn player_control(mut query: Query<(&Fighter,
                                     &mut FacingEast,)>,
                                     keyboard_input_resource: Res<Input<KeyCode>>,
                                     time: Res<Time>,
+                                    figher_movement_map_collection: Res<FighterMovementMapCollection>,
                                     ) {
     let keyboard_input = keyboard_input_resource.into_inner();
 
@@ -361,7 +364,7 @@ fn player_control(mut query: Query<(&Fighter,
         mut velocity,
         mut facing_east) in query.iter_mut() {
 
-        let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap();
+        let fighter_map = figher_movement_map_collection.0.get(&fighter).unwrap();
 
         //update event_keytargetset_stack and movement stack
         movement_stack.0.update(time.delta_seconds());
@@ -452,7 +455,8 @@ fn update_state(mut query: Query<(&Fighter,
                                     &FighterHitBox,
                                     &FighterHurtBox,
                                     &mut FighterMovementStack,)>,
-                                    time: Res<Time>,) {
+                                    time: Res<Time>,
+                                    figher_movement_map_collection: Res<FighterMovementMapCollection>,) {
     let dt = time.delta_seconds();
     
     for (fighter,
@@ -463,7 +467,7 @@ fn update_state(mut query: Query<(&Fighter,
         hurtbox,
         mut movement_stack) in query.iter_mut() {
 
-        let fighter_map = FIGHTERS_MOVEMENT_GRAPH.get(&fighter)
+        let fighter_map = figher_movement_map_collection.0.get(&fighter)
             .expect("fighter does not exist in the movement graph");
         if let Some(current_durative_movement) = movement_stack.last() {
             let movement_node = fighter_map.get_node_by_movement(&current_durative_movement.value)
@@ -512,6 +516,7 @@ fn update_shadows(query_fighter_position: Query<&FighterPosition>,
 }
 
 fn draw_fighters(time: Res<Time>,
+                figher_movement_map_collection: Res<FighterMovementMapCollection>,
                 fighters_movement_animation_indicies: Res<FightersMovementAnimationIndicies>,
                 mut animation_timer: ResMut<AnimationTimer>,
                 mut query: Query<(&Fighter,
@@ -530,7 +535,7 @@ fn draw_fighters(time: Res<Time>,
         mut transform) in query.iter_mut() {
         
         if let Some(last_durative_movement) = movement_stack.0.stack.last() {
-            let movement_node = FIGHTERS_MOVEMENT_GRAPH.get(&fighter).unwrap()
+            let movement_node = figher_movement_map_collection.0.get(&fighter).unwrap()
                                                                 .get_node_by_movement(&last_durative_movement.value).unwrap();
             let sprite_name = movement_node.sprite_name();
 

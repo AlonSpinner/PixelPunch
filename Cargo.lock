@@ -2643,7 +2643,6 @@ dependencies = [
  "bevy_embedded_assets",
  "bevy_prototype_lyon",
  "bevy_tile_atlas",
- "once_cell",
  "serde",
  "serde_yaml",
  "strum",
