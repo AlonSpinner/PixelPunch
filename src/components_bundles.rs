@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy_prototype_lyon::prelude::*;
 use strum_macros::Display;
 use std::collections::BTreeSet;
-use std::ops::Add;
+use std::ops::{Add, Sub};
 use std::fmt::Display;
 use std::fmt;
 
@@ -31,6 +31,12 @@ pub struct FighterPosition {
 impl From<&FighterPosition> for [f32;3]{
     fn from(xyz : &FighterPosition) -> [f32;3] {
         [xyz.x,xyz.y,xyz.z]
+    }
+}
+
+impl From<&FighterPosition> for Vec3{
+    fn from(xyz : &FighterPosition) -> Vec3 {
+        Vec3::new(xyz.x,xyz.y,xyz.z)
     }
 }
 

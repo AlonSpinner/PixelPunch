@@ -55,7 +55,8 @@ fn main() {
     )
     .add_systems(
         Update,
-        (update_state).run_if(in_state(AppState::InGame)),
+        (update_state,
+                do_damage).run_if(in_state(AppState::InGame)),
     )
     .add_systems(
         PostUpdate,
@@ -448,6 +449,43 @@ fn player_control(mut query: Query<(&Fighter,
         }
     }  
 }
+
+fn do_damage(mut query: Query<(&FighterPosition,
+                                &FighterMovementStack,
+                                &FacingEast,
+                                &mut FighterHealth)>) {
+    let mut combinations = query.iter_combinations_mut();
+    while let Some([(pos1, movement_stack1,facing_east1,mut health1),
+     (pos2, movement_stack2,facing_east2, mut health2)]) = combinations.fetch_next() {
+        
+        //check if fighter1 is slashing and fighter2 is in range
+        if let Some(current_movement) =  movement_stack1.last() {
+            if current_movement.value == FighterMovement::Slashing {
+                let rel = Vec3::new(pos2.x, pos2.y, pos2.z) - Vec3::new(pos1.x, pos1.y, pos1.z);
+                if rel[0] > 0.0 && facing_east1.0 || rel[0] < 0.0 && !facing_east1.0 {
+                    if rel.length() < 50.0 {
+                        health2.current = (health2.current - 10.0).max(0.0).min(health2.max);
+                    }
+                }
+            }
+        }
+
+        //check if fighter2 is slashing and fighter1 is in range
+        if let Some(current_movement) =  movement_stack2.last() {
+            if current_movement.value == FighterMovement::Slashing {
+                let rel = Vec3::new(pos1.x, pos1.y, pos1.z) - Vec3::new(pos2.x, pos2.y, pos2.z);
+                if rel[0] > 0.0 && facing_east2.0 || rel[0] < 0.0 && !facing_east2.0 {
+                    if rel.length() < 50.0 {
+                        health1.current = (health1.current - 10.0).max(0.0).min(health1.max);
+                    }
+                }
+            }
+        }
+    
+    }
+
+}
+
 fn update_state(mut query: Query<(&Fighter,
                                     &mut FighterPosition,
                                     &mut FighterVelocity,
