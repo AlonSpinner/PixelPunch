@@ -267,6 +267,18 @@ impl Default for FighterMovementMap {
              hit_box: HitBox::default(),
              hurt_box: HitBox::default()
         });
+
+        map.insert_to_uncontrollable_map(UncontrollableFighterMovementNode {
+            base: FighterMovementNodeBase { 
+                movement: FighterMovement::Dead,
+                sprite_name: "Dying".to_string(),
+                state_update: |pos,vel,dt| {},
+                state_enter: |_,_,_| {}, 
+            },
+            player_can_enter: |floor_z,z| true,
+            hit_box: HitBox::default(),
+            hurt_box: HitBox::default()
+       });
                     
         map.insert_to_persistent_map(KeyTargetSet::from([KeyTarget::Right]),
         PersistentFighterMovementNode { 

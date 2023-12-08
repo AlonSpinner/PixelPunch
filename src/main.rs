@@ -365,6 +365,13 @@ fn player_control(mut query: Query<(&Fighter,
         mut velocity,
         mut facing_east) in query.iter_mut() {
 
+        if let Some(current_durative_movement) = movement_stack.last() {
+            if current_durative_movement.value == FighterMovement::Dead {
+                continue
+            }
+        }
+           
+
         let fighter_map = figher_movement_map_collection.0.get(&fighter).unwrap();
 
         //update event_keytargetset_stack and movement stack
@@ -451,12 +458,12 @@ fn player_control(mut query: Query<(&Fighter,
 }
 
 fn do_damage(mut query: Query<(&FighterPosition,
-                                &FighterMovementStack,
+                                &mut FighterMovementStack,
                                 &FacingEast,
                                 &mut FighterHealth)>) {
     let mut combinations = query.iter_combinations_mut();
-    while let Some([(pos1, movement_stack1,facing_east1,mut health1),
-     (pos2, movement_stack2,facing_east2, mut health2)]) = combinations.fetch_next() {
+    while let Some([(pos1, mut movement_stack1,facing_east1,mut health1),
+     (pos2, mut movement_stack2,facing_east2, mut health2)]) = combinations.fetch_next() {
         
         //check if fighter1 is slashing and fighter2 is in range
         if let Some(current_movement) =  movement_stack1.last() {
@@ -465,6 +472,8 @@ fn do_damage(mut query: Query<(&FighterPosition,
                 if rel[0] > 0.0 && facing_east1.0 || rel[0] < 0.0 && !facing_east1.0 {
                     if rel.length() < 50.0 {
                         health2.current = (health2.current - 10.0).max(0.0).min(health2.max);
+                        movement_stack2.push(FighterMovement::Dead);
+
                     }
                 }
             }
@@ -477,6 +486,7 @@ fn do_damage(mut query: Query<(&FighterPosition,
                 if rel[0] > 0.0 && facing_east2.0 || rel[0] < 0.0 && !facing_east2.0 {
                     if rel.length() < 50.0 {
                         health1.current = (health1.current - 10.0).max(0.0).min(health1.max);
+                        movement_stack1.push(FighterMovement::Dead);
                     }
                 }
             }

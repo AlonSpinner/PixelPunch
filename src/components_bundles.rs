@@ -188,6 +188,7 @@ pub enum FighterMovement {
     Docking,
     InAir,
     JumpAttack,
+    Dead,
 }
 
 #[derive(Component)]
